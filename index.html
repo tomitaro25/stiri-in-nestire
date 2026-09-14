@@ -337,6 +337,11 @@
       </div>
       <div class="settings-group">
         <p class="settings-label">Surse afișate</p>
+        <div class="segmented" id="countryQuickGroup" style="margin-bottom:0.6rem;">
+          <button data-value="all">Toate</button>
+          <button data-value="RO">Românești</button>
+          <button data-value="International">Internaționale</button>
+        </div>
         <div class="source-checklist" id="sourceChecklist"></div>
         <button class="select-all-btn" id="selectAllBtn">Selectează tot</button>
       </div>
@@ -446,43 +451,82 @@
     });
   }
 
-  function renderSourceChecklist(discoveredSources) {
+  function renderSourceChecklist() {
     const container = document.getElementById('sourceChecklist');
     container.innerHTML = '';
-    const effectiveSelected = settings.selectedSources || discoveredSources;
+    const discovered = sourceMeta.map(s => s.name);
+    const effectiveSelected = settings.selectedSources || discovered;
 
-    discoveredSources.forEach(name => {
-      const label = document.createElement('label');
-      label.className = 'source-check';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = effectiveSelected.includes(name);
-      checkbox.addEventListener('change', () => {
-        const current = new Set(settings.selectedSources || discoveredSources);
-        if (checkbox.checked) current.add(name); else current.delete(name);
-        settings.selectedSources = Array.from(current);
-        saveSettings(settings);
-        activeFilter = 'Toate';
-        renderTabs();
-        renderList();
+    // Grupam sursele pe categorie, ca sa fie usor de scanat lista cand cresc sursele
+    const byCategory = {};
+    sourceMeta.forEach(s => {
+      const cat = s.category || 'Altele';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(s);
+    });
+
+    Object.keys(byCategory).sort().forEach(cat => {
+      const heading = document.createElement('p');
+      heading.textContent = cat;
+      heading.style.cssText = 'font-size:0.72rem;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;margin:0.7rem 0 0.3rem;';
+      container.appendChild(heading);
+
+      byCategory[cat].forEach(s => {
+        const label = document.createElement('label');
+        label.className = 'source-check';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = effectiveSelected.includes(s.name);
+        checkbox.addEventListener('change', () => {
+          const current = new Set(settings.selectedSources || discovered);
+          if (checkbox.checked) current.add(s.name); else current.delete(s.name);
+          settings.selectedSources = Array.from(current);
+          saveSettings(settings);
+          activeFilter = 'Toate';
+          renderTabs();
+          renderList();
+        });
+        label.appendChild(checkbox);
+        const countryTag = s.country === 'RO' ? 'RO' : 'INT';
+        label.appendChild(document.createTextNode(`${s.name} `));
+        const tagSpan = document.createElement('span');
+        tagSpan.textContent = countryTag;
+        tagSpan.style.cssText = 'font-size:0.68rem;color:var(--ink-soft);border:1px solid var(--rule);border-radius:4px;padding:0.05rem 0.3rem;';
+        label.appendChild(tagSpan);
+        container.appendChild(label);
       });
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(name));
-      container.appendChild(label);
     });
 
     document.getElementById('selectAllBtn').onclick = () => {
       settings.selectedSources = null;
       saveSettings(settings);
-      renderSourceChecklist(discoveredSources);
+      renderSourceChecklist();
       activeFilter = 'Toate';
       renderTabs();
       renderList();
     };
+
+    // Butoane rapide: Toate / Romanesti / Internationale
+    const quickGroup = document.getElementById('countryQuickGroup');
+    Array.from(quickGroup.children).forEach(btn => {
+      btn.onclick = () => {
+        if (btn.dataset.value === 'all') {
+          settings.selectedSources = null;
+        } else {
+          settings.selectedSources = sourceMeta.filter(s => s.country === btn.dataset.value).map(s => s.name);
+        }
+        saveSettings(settings);
+        renderSourceChecklist();
+        activeFilter = 'Toate';
+        renderTabs();
+        renderList();
+      };
+    });
   }
 
   // ---- Stare ----
   let allItems = [];
+  let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
   let activeFilter = 'Toate';
 
   const tabsEl = document.getElementById('tabs');
@@ -523,7 +567,7 @@
 
   // ---- Sursele "efective" (cele bifate in setari) ----
   function discoveredSourceNames() {
-    return Array.from(new Set(allItems.map(i => i.source)));
+    return sourceMeta.map(s => s.name);
   }
   function effectiveSources() {
     const discovered = discoveredSourceNames();
@@ -640,11 +684,12 @@
     try {
       const res = await fetch(WORKER_URL);
       if (!res.ok) throw new Error('Răspuns invalid de la server');
-      const items = await res.json();
+      const data = await res.json();
 
-      allItems = items.filter(i => i.title && i.link).sort((a, b) => new Date(b.date) - new Date(a.date));
+      sourceMeta = data.sources || [];
+      allItems = (data.items || []).filter(i => i.title && i.link).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-      renderSourceChecklist(discoveredSourceNames());
+      renderSourceChecklist();
       renderTabs();
       renderList();
     } catch (err) {
