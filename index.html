@@ -301,6 +301,40 @@
     border-radius: 6px;
     cursor: pointer;
   }
+
+  /* Banner "versiune noua" */
+  .update-banner {
+    display: none;
+    position: fixed;
+    left: 50%;
+    bottom: 1.1rem;
+    transform: translateX(-50%);
+    max-width: calc(var(--max-width) - 2rem);
+    width: calc(100% - 2rem);
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+    z-index: 50;
+  }
+  .update-banner.visible { display: flex; }
+  .update-banner button {
+    appearance: none;
+    border: 1px solid var(--paper);
+    background: transparent;
+    color: var(--paper);
+    font-family: inherit;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -351,6 +385,11 @@
     <main id="main">
       <div class="state">Se încarcă titlurile…</div>
     </main>
+
+    <div class="update-banner" id="updateBanner">
+      <span>O versiune nouă e disponibilă.</span>
+      <button id="updateReloadBtn">Reîncarcă</button>
+    </div>
   </div>
 
 <script>
@@ -708,9 +747,40 @@
   initSettingsPanel();
   loadFeed();
 
+  // ---- Detectare versiune noua a aplicatiei ----
   if ('serviceWorker' in navigator) {
+    function showUpdateBanner(waitingWorker) {
+      const banner = document.getElementById('updateBanner');
+      banner.classList.add('visible');
+      document.getElementById('updateReloadBtn').onclick = () => {
+        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      };
+    }
+
+    let refreshingPage = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshingPage) return;
+      refreshingPage = true;
+      window.location.reload();
+    });
+
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('sw.js').then(registration => {
+        // Caz 1: exista deja un worker nou, in asteptare, de la o vizita anterioara
+        if (registration.waiting) {
+          showUpdateBanner(registration.waiting);
+        }
+        // Caz 2: se instaleaza un worker nou chiar acum, cat timp pagina e deschisa
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner(newWorker);
+            }
+          });
+        });
+      }).catch(() => {});
     });
   }
 </script>
