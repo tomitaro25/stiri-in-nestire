@@ -219,9 +219,10 @@
   }
 
   .tab[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--paper);
-    border-color: var(--ink);
+    background: var(--paper-raised);
+    color: var(--ink);
+    border-color: var(--teal);
+    font-weight: 600;
   }
 
   /* List */
@@ -386,11 +387,6 @@
       </div>
       <div class="settings-group">
         <p class="settings-label">Surse afișate</p>
-        <div class="segmented" id="countryQuickGroup" style="margin-bottom:0.6rem;">
-          <button data-value="all">Toate</button>
-          <button data-value="RO">Românești</button>
-          <button data-value="International">Internaționale</button>
-        </div>
         <div class="source-checklist" id="sourceChecklist"></div>
         <button class="select-all-btn" id="selectAllBtn">Selectează tot</button>
       </div>
@@ -515,8 +511,8 @@
   }
 
   function resetToAllView() {
-    activeCategory = 'Toate';
-    activeSource = null;
+    activeCategories = new Set();
+    activeSources = new Set();
     renderTabs();
     renderSourceChips();
     renderList();
@@ -582,30 +578,13 @@
       renderSourceChecklist();
       resetToAllView();
     };
-
-    // Butoane rapide: Toate / Romanesti / Internationale
-    const quickGroup = document.getElementById('countryQuickGroup');
-    Array.from(quickGroup.children).forEach(btn => {
-      btn.onclick = () => {
-        if (btn.dataset.value === 'all') {
-          settings.selectedSources = null;
-        } else if (btn.dataset.value === 'RO') {
-          settings.selectedSources = sourceMeta.filter(s => s.country === 'RO').map(s => s.name);
-        } else {
-          settings.selectedSources = sourceMeta.filter(s => s.country !== 'RO').map(s => s.name);
-        }
-        saveSettings(settings);
-        renderSourceChecklist();
-        resetToAllView();
-      };
-    });
   }
 
   // ---- Stare ----
   let allItems = [];
   let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
-  let activeCategory = 'Toate'; // 'Toate' | 'Actualitati' | 'Sport' | ... | 'International'
-  let activeSource = null; // null = toate sursele din categoria activa
+  let activeCategories = new Set(); // gol = toate categoriile
+  let activeSources = new Set(); // gol = toate sursele din categoriile active
 
   const CATEGORY_LABELS = {
     Actualitati: 'Actualități',
@@ -662,7 +641,7 @@
     const discovered = discoveredSourceNames();
     return settings.selectedSources ? settings.selectedSources.filter(s => discovered.includes(s)) : discovered;
   }
-  // Sursele (cu metadate) care sunt bifate SI apartin categoriei date
+  // Sursele (cu metadate), bifate in setari, care apartin unei anumite categorii
   // ('International' = orice sursa cu country !== 'RO', indiferent de category)
   function sourcesInCategory(category) {
     const active = new Set(effectiveSources());
@@ -671,18 +650,27 @@
       return category === 'International' ? s.country !== 'RO' : (s.category === category && s.country === 'RO');
     });
   }
+  // Reuniunea surselor din toate categoriile active (pentru randul secundar de chip-uri)
+  function sourcesInActiveCategories() {
+    const seen = new Map();
+    activeCategories.forEach(cat => {
+      sourcesInCategory(cat).forEach(s => seen.set(s.name, s));
+    });
+    return Array.from(seen.values());
+  }
   function poolItems() {
-    let names;
-    if (activeCategory === 'Toate') {
-      names = effectiveSources();
-    } else {
-      names = sourcesInCategory(activeCategory).map(s => s.name);
+    let names = effectiveSources();
+    if (activeCategories.size > 0) {
+      const namesInActiveCats = sourcesInActiveCategories().map(s => s.name);
+      names = names.filter(n => namesInActiveCats.includes(n));
     }
-    if (activeSource) names = names.filter(n => n === activeSource);
+    if (activeSources.size > 0) {
+      names = names.filter(n => activeSources.has(n));
+    }
     return allItems.filter(i => names.includes(i.source));
   }
 
-  // ---- Randare taburi (categorii) ----
+  // ---- Randare taburi (categorii, selectie multipla) ----
   function renderTabs() {
     const active = new Set(effectiveSources());
     const presentRoCategories = new Set(
@@ -690,19 +678,19 @@
     );
     const hasInternational = sourceMeta.some(s => active.has(s.name) && s.country !== 'RO');
 
-    const categories = ['Toate', ...CATEGORY_ORDER.filter(c =>
+    const categories = CATEGORY_ORDER.filter(c =>
       c === 'International' ? hasInternational : presentRoCategories.has(c)
-    )];
+    );
 
     tabsEl.innerHTML = '';
     categories.forEach(cat => {
       const btn = document.createElement('button');
       btn.className = 'tab';
-      btn.textContent = cat === 'Toate' ? 'Toate' : (CATEGORY_LABELS[cat] || cat);
-      btn.setAttribute('aria-pressed', String(cat === activeCategory));
+      btn.textContent = CATEGORY_LABELS[cat] || cat;
+      btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
       btn.addEventListener('click', () => {
-        activeCategory = cat;
-        activeSource = null;
+        if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
+        activeSources = new Set(); // schimbarea categoriilor reseteaza ingustarea pe surse individuale
         renderTabs();
         renderSourceChips();
         renderList();
@@ -711,38 +699,27 @@
     });
   }
 
-  // ---- Randare rand secundar (surse individuale din categoria activa) ----
+  // ---- Randare rand secundar (surse individuale, selectie multipla) ----
   function renderSourceChips() {
     subTabsEl.innerHTML = '';
-    if (activeCategory === 'Toate') {
+    if (activeCategories.size === 0) {
       subTabsEl.classList.remove('visible');
       return;
     }
-    const sources = sourcesInCategory(activeCategory);
+    const sources = sourcesInActiveCategories();
     if (sources.length <= 1) {
       subTabsEl.classList.remove('visible');
       return;
     }
     subTabsEl.classList.add('visible');
 
-    const allChip = document.createElement('button');
-    allChip.className = 'tab tab-sub';
-    allChip.textContent = 'Toate';
-    allChip.setAttribute('aria-pressed', String(activeSource === null));
-    allChip.addEventListener('click', () => {
-      activeSource = null;
-      renderSourceChips();
-      renderList();
-    });
-    subTabsEl.appendChild(allChip);
-
     sources.forEach(s => {
       const btn = document.createElement('button');
       btn.className = 'tab tab-sub';
       btn.textContent = s.name;
-      btn.setAttribute('aria-pressed', String(activeSource === s.name));
+      btn.setAttribute('aria-pressed', String(activeSources.has(s.name)));
       btn.addEventListener('click', () => {
-        activeSource = s.name;
+        if (activeSources.has(s.name)) activeSources.delete(s.name); else activeSources.add(s.name);
         renderSourceChips();
         renderList();
       });
