@@ -107,6 +107,28 @@
   button.icon-btn:hover, button.icon-btn:focus-visible { background: var(--paper-raised); }
   button.icon-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
+  .header-actions { display: flex; gap: 0.15rem; }
+
+  /* Bara de cautare */
+  .search-bar {
+    display: none;
+    padding: 0.75rem 1.1rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .search-bar.visible { display: block; }
+  .search-bar input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+  }
+  .search-bar input:focus { outline: 2px solid var(--teal); outline-offset: -1px; }
+
   /* Settings panel */
   .settings-panel {
     border-bottom: 1px solid var(--rule);
@@ -403,8 +425,15 @@
         <p class="wordmark">Știri în neștire</p>
         <p class="tagline">Titluri, rapid. Fără reclame, fără zgomot.</p>
       </div>
-      <button class="icon-btn" id="settingsBtn" aria-label="Setări" aria-expanded="false">⚙</button>
+      <div class="header-actions">
+        <button class="icon-btn" id="searchBtn" aria-label="Caută" aria-expanded="false">🔍</button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Setări" aria-expanded="false">⚙</button>
+      </div>
     </header>
+
+    <div class="search-bar" id="searchBar">
+      <input type="text" id="searchInput" placeholder="Caută în titluri…" autocomplete="off">
+    </div>
 
     <div class="settings-panel" id="settingsPanel">
       <div class="settings-group">
@@ -561,6 +590,24 @@
       const isOpen = panel.classList.toggle('open');
       document.getElementById('settingsBtn').setAttribute('aria-expanded', String(isOpen));
     });
+
+    document.getElementById('searchBtn').addEventListener('click', () => {
+      const bar = document.getElementById('searchBar');
+      const input = document.getElementById('searchInput');
+      const isOpen = bar.classList.toggle('visible');
+      document.getElementById('searchBtn').setAttribute('aria-expanded', String(isOpen));
+      if (isOpen) {
+        input.focus();
+      } else {
+        input.value = '';
+        searchQuery = '';
+        renderList();
+      }
+    });
+    document.getElementById('searchInput').addEventListener('input', e => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      renderList();
+    });
   }
 
   function resetToAllView() {
@@ -640,6 +687,7 @@
   let activeSources = new Set(); // gol = toate sursele din categoriile active
   let currentView = 'list'; // 'list' | 'article' - pentru butoanele inapoi/inainte proprii
   let hasForwardEntry = false;
+  let searchQuery = ''; // cautare dupa cuvinte din titlu
 
   const CATEGORY_LABELS = {
     Actualitati: 'Actualități',
@@ -731,7 +779,11 @@
     if (activeSources.size > 0) {
       names = names.filter(n => activeSources.has(n));
     }
-    return allItems.filter(i => names.includes(i.source));
+    let items = allItems.filter(i => names.includes(i.source));
+    if (searchQuery) {
+      items = items.filter(i => i.title.toLowerCase().includes(searchQuery));
+    }
+    return items;
   }
 
   // ---- Randare taburi (categorii, selectie multipla) ----
@@ -821,7 +873,7 @@
       if (item.image) {
         const img = document.createElement('img');
         img.className = 'item-thumb';
-        img.src = item.image;
+        img.src = `${WORKER_URL}?image=${encodeURIComponent(item.image)}`;
         img.alt = '';
         img.loading = 'lazy';
         img.addEventListener('error', () => img.remove());
