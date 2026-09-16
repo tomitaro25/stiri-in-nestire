@@ -72,7 +72,7 @@
 
   /* Masthead */
   header.masthead {
-    padding: 1.5rem 1.1rem 0.9rem;
+    padding: calc(env(safe-area-inset-top, 0px) + 44px + 1.5rem) 1.1rem 0.9rem;
     border-bottom: 1px solid var(--rule);
     display: flex;
     align-items: flex-start;
@@ -247,17 +247,31 @@
     font-weight: 600;
   }
 
-  /* Bara de navigare (inapoi/inainte) */
+  /* Bara de navigare (inapoi/inainte) - fixata, mereu vizibila, fara scroll */
   nav.nav-bar {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: var(--max-width);
+    min-height: 44px;
+    box-sizing: border-box;
     display: flex;
+    align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
+    background: var(--paper);
+    z-index: 40;
+  }
+  nav.nav-bar#navBarTop {
+    top: 0;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
     border-bottom: 1px solid var(--rule);
   }
-  nav.nav-bar.nav-bar-bottom {
-    border-bottom: none;
+  nav.nav-bar#navBarBottom {
+    bottom: 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
     border-top: 1px solid var(--rule);
-    margin-top: auto;
   }
   .nav-btn {
     all: unset;
@@ -279,7 +293,7 @@
   .nav-btn:not(:disabled):hover { background: var(--paper-raised); }
 
   /* Lista de articole, cu poza mica optionala */
-  main { flex: 1; padding: 0.25rem 0 2.5rem; }
+  main { flex: 1; padding: 0.25rem 0 calc(env(safe-area-inset-bottom, 0px) + 44px + 2.5rem); }
 
   ul.list { list-style: none; margin: 0; padding: 0; }
   li.item { border-bottom: 1px solid var(--rule); }
@@ -388,7 +402,7 @@
     display: none;
     position: fixed;
     left: 50%;
-    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+    top: calc(env(safe-area-inset-top, 0px) + 44px + 0.75rem);
     transform: translateX(-50%);
     max-width: calc(var(--max-width) - 2rem);
     width: calc(100% - 2rem);
@@ -475,7 +489,7 @@
       <div class="state">Se încarcă titlurile…</div>
     </main>
 
-    <nav class="nav-bar nav-bar-bottom" id="navBarBottom">
+    <nav class="nav-bar" id="navBarBottom">
       <button class="nav-btn" id="backBtnBottom" aria-label="Înapoi">← Înapoi</button>
       <button class="nav-btn" id="forwardBtnBottom" aria-label="Înainte">Înainte →</button>
     </nav>
@@ -653,20 +667,21 @@
       container.appendChild(label);
     }
 
-    // 1. Sursele romanesti, grupate pe categorie (Actualitati, Sport, ...)
-    const roByCategory = {};
-    sourceMeta.filter(s => s.country === 'RO').forEach(s => {
+    // 1. Grupare pe categorie: sursele romanesti, plus cele de la IT/Tech
+    // (acolo se aduna si sursele internationale, ex. XDA Developers).
+    const byCategory = {};
+    sourceMeta.filter(s => s.country === 'RO' || s.category === 'IT').forEach(s => {
       const cat = s.category || 'Altele';
-      if (!roByCategory[cat]) roByCategory[cat] = [];
-      roByCategory[cat].push(s);
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(s);
     });
-    Object.keys(roByCategory).sort().forEach(cat => {
+    Object.keys(byCategory).sort().forEach(cat => {
       addHeading(CATEGORY_LABELS[cat] || cat);
-      roByCategory[cat].forEach(addSourceCheck);
+      byCategory[cat].forEach(addSourceCheck);
     });
 
-    // 2. Sursele internationale, intr-o sectiune separata, indiferent de categoria lor
-    const international = sourceMeta.filter(s => s.country !== 'RO');
+    // 2. Restul surselor internationale (orice, in afara de IT/Tech), separat
+    const international = sourceMeta.filter(s => s.country !== 'RO' && s.category !== 'IT');
     if (international.length > 0) {
       addHeading('Internaționale');
       international.forEach(addSourceCheck);
@@ -693,7 +708,7 @@
     Actualitati: 'Actualități',
     Sport: 'Sport',
     Financiar: 'Financiar',
-    IT: 'IT',
+    IT: 'IT/Tech',
     Religie: 'Religie',
     Cultura: 'Cultură',
     International: 'Internațional'
@@ -753,13 +768,18 @@
     const discovered = discoveredSourceNames();
     return settings.selectedSources ? settings.selectedSources.filter(s => discovered.includes(s)) : discovered;
   }
-  // Sursele (cu metadate), bifate in setari, care apartin unei anumite categorii
-  // ('International' = orice sursa cu country !== 'RO', indiferent de category)
+  // Sursele (cu metadate), bifate in setari, care apartin unei anumite categorii.
+  // 'International' = orice sursa cu country !== 'RO', DAR nu si cele deja
+  // incadrate la IT/Tech (acelea apar doar acolo, ca sa nu se duplice).
+  // 'IT' e singura categorie care accepta si surse internationale (ex. XDA
+  // Developers), pentru ca subiectul conteaza mai mult decat tara aici.
   function sourcesInCategory(category) {
     const active = new Set(effectiveSources());
     return sourceMeta.filter(s => {
       if (!active.has(s.name)) return false;
-      return category === 'International' ? s.country !== 'RO' : (s.category === category && s.country === 'RO');
+      if (category === 'International') return s.country !== 'RO' && s.category !== 'IT';
+      if (category === 'IT') return s.category === 'IT';
+      return s.category === category && s.country === 'RO';
     });
   }
   // Reuniunea surselor din toate categoriile active (pentru randul secundar de chip-uri)
@@ -788,15 +808,10 @@
 
   // ---- Randare taburi (categorii, selectie multipla) ----
   function renderTabs() {
-    const active = new Set(effectiveSources());
-    const presentRoCategories = new Set(
-      sourceMeta.filter(s => active.has(s.name) && s.country === 'RO').map(s => s.category)
-    );
-    const hasInternational = sourceMeta.some(s => active.has(s.name) && s.country !== 'RO');
-
-    const categories = CATEGORY_ORDER.filter(c =>
-      c === 'International' ? hasInternational : presentRoCategories.has(c)
-    );
+    // O categorie apare in bara de taburi doar daca are cel putin o sursa activa
+    // (sourcesInCategory stie deja regulile speciale: International exclude IT,
+    // iar IT accepta si surse non-RO).
+    const categories = CATEGORY_ORDER.filter(c => sourcesInCategory(c).length > 0);
 
     tabsEl.innerHTML = '';
     categories.forEach(cat => {
