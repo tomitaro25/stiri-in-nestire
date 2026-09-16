@@ -256,48 +256,7 @@
   }
   .nav-btn:not(:disabled):hover { background: var(--paper-raised); }
 
-  /* Hero */
-  .hero { padding: 0.9rem 1.1rem 0.5rem; }
-  .hero-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--ink-soft);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin: 0 0 0.6rem;
-  }
-  .hero-card {
-    all: unset;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.6rem 0;
-    border-bottom: 1px solid var(--rule);
-    cursor: pointer;
-  }
-  .hero-card:last-child { border-bottom: none; }
-  .hero-card:hover, .hero-card:focus-visible { background: var(--paper-raised); }
-  .hero-thumb {
-    flex: 0 0 auto;
-    width: 4.5rem;
-    height: 4.5rem;
-    border-radius: 8px;
-    object-fit: cover;
-    background: var(--paper-raised);
-  }
-  .hero-text { flex: 1; min-width: 0; }
-  .hero-title {
-    font-family: 'Source Serif 4', serif;
-    font-weight: 600;
-    font-size: 1.02rem;
-    line-height: 1.28;
-    margin: 0 0 0.35rem;
-    color: var(--ink);
-  }
-
-  /* List */
+  /* Lista de articole, cu poza mica optionala */
   main { flex: 1; padding: 0.25rem 0 2.5rem; }
 
   ul.list { list-style: none; margin: 0; padding: 0; }
@@ -305,20 +264,32 @@
 
   button.item-btn {
     all: unset;
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
     width: 100%;
-    padding: 1.1rem 1.25rem;
+    padding: 1rem 1.25rem;
     cursor: pointer;
     box-sizing: border-box;
   }
   button.item-btn:hover, button.item-btn:focus-visible { background: var(--paper-raised); }
   button.item-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 
+  .item-thumb {
+    flex: 0 0 auto;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--paper-raised);
+  }
+  .item-text { flex: 1; min-width: 0; }
+
   .item-title {
     font-family: 'Source Serif 4', serif;
     font-weight: 600;
-    font-size: 1.19rem;
-    line-height: 1.32;
+    font-size: 1.11rem;
+    line-height: 1.3;
     margin: 0 0 0.5rem;
     color: var(--ink);
   }
@@ -667,7 +638,6 @@
   let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
   let activeCategories = new Set(); // gol = toate categoriile
   let activeSources = new Set(); // gol = toate sursele din categoriile active
-  let heroCategory = 'Actualitati'; // sectiunea implicita pentru Hero
   let currentView = 'list'; // 'list' | 'article' - pentru butoanele inapoi/inainte proprii
   let hasForwardEntry = false;
 
@@ -756,60 +726,6 @@
     return allItems.filter(i => names.includes(i.source));
   }
 
-  // ---- Hero: ultimele 2-3 articole din sectiunea urmarita (heroCategory) ----
-  function heroItems() {
-    const names = sourcesInCategory(heroCategory).map(s => s.name);
-    return allItems.filter(i => names.includes(i.source)).slice(0, 3);
-  }
-
-  function renderHero(container) {
-    const items = heroItems();
-    if (items.length === 0) return;
-
-    const wrap = document.createElement('div');
-    wrap.className = 'hero';
-
-    const label = document.createElement('p');
-    label.className = 'hero-label';
-    label.textContent = CATEGORY_LABELS[heroCategory] || heroCategory;
-    wrap.appendChild(label);
-
-    items.forEach(item => {
-      const card = document.createElement('button');
-      card.className = 'hero-card';
-
-      if (item.image) {
-        const img = document.createElement('img');
-        img.className = 'hero-thumb';
-        img.src = item.image;
-        img.alt = '';
-        img.loading = 'lazy';
-        img.addEventListener('error', () => img.remove());
-        card.appendChild(img);
-      }
-
-      const textWrap = document.createElement('div');
-      textWrap.className = 'hero-text';
-
-      const title = document.createElement('p');
-      title.className = 'hero-title';
-      title.textContent = item.title;
-
-      const meta = document.createElement('div');
-      meta.className = 'item-meta';
-      meta.innerHTML = `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span><span>·</span><span>${formatRelativeTime(item.date)}</span>`;
-
-      textWrap.appendChild(title);
-      textWrap.appendChild(meta);
-      card.appendChild(textWrap);
-
-      card.addEventListener('click', () => navigateToArticle(item));
-      wrap.appendChild(card);
-    });
-
-    container.appendChild(wrap);
-  }
-
   // ---- Randare taburi (categorii, selectie multipla) ----
   function renderTabs() {
     const active = new Set(effectiveSources());
@@ -829,17 +745,7 @@
       btn.textContent = CATEGORY_LABELS[cat] || cat;
       btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
       btn.addEventListener('click', () => {
-        if (activeCategories.has(cat)) {
-          activeCategories.delete(cat);
-        } else {
-          activeCategories.add(cat);
-          heroCategory = cat; // ultima categorie activata devine sectiunea Hero
-        }
-        if (!activeCategories.has(heroCategory)) {
-          // categoria urmarita de Hero nu mai e activa: alegem alta activa, sau revenim la implicit
-          const firstActive = CATEGORY_ORDER.find(c => activeCategories.has(c));
-          heroCategory = firstActive || 'Actualitati';
-        }
+        if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
         activeSources = new Set(); // schimbarea categoriilor reseteaza ingustarea pe surse individuale
         renderTabs();
         renderSourceChips();
@@ -883,7 +789,6 @@
     const filtered = poolItems();
 
     mainEl.innerHTML = '';
-    renderHero(mainEl);
 
     if (filtered.length === 0) {
       const state = document.createElement('div');
@@ -905,6 +810,19 @@
       const btn = document.createElement('button');
       btn.className = 'item-btn';
 
+      if (item.image) {
+        const img = document.createElement('img');
+        img.className = 'item-thumb';
+        img.src = item.image;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.addEventListener('error', () => img.remove());
+        btn.appendChild(img);
+      }
+
+      const textWrap = document.createElement('div');
+      textWrap.className = 'item-text';
+
       const title = document.createElement('p');
       title.className = 'item-title';
       title.textContent = item.title;
@@ -913,8 +831,9 @@
       meta.className = 'item-meta';
       meta.innerHTML = `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span><span>·</span><span>${formatRelativeTime(item.date)}</span>`;
 
-      btn.appendChild(title);
-      btn.appendChild(meta);
+      textWrap.appendChild(title);
+      textWrap.appendChild(meta);
+      btn.appendChild(textWrap);
       btn.addEventListener('click', () => navigateToArticle(item));
 
       li.appendChild(btn);
