@@ -636,7 +636,7 @@
   // ---- Stare ----
   let allItems = [];
   let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
-  let activeCategories = new Set(); // gol = toate categoriile
+  let activeCategories = new Set(['Actualitati']); // implicit: doar sectiunea Actualitati (Stiri)
   let activeSources = new Set(); // gol = toate sursele din categoriile active
   let currentView = 'list'; // 'list' | 'article' - pentru butoanele inapoi/inainte proprii
   let hasForwardEntry = false;
