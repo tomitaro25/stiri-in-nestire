@@ -668,13 +668,21 @@
     const date = new Date(dateStr);
     if (isNaN(date)) return '';
     const diffMs = Date.now() - date.getTime();
-    const diffMin = Math.round(diffMs / 60000);
+    const diffMin = Math.max(0, Math.round(diffMs / 60000)); // o data din viitor (surse cu erori) devine "chiar acum"
     if (diffMin < 1) return 'chiar acum';
     if (diffMin < 60) return `acum ${diffMin} min`;
     const diffH = Math.round(diffMin / 60);
     if (diffH < 24) return `acum ${diffH} h`;
     const diffD = Math.round(diffH / 24);
     return `acum ${diffD} zile`;
+  }
+
+  // Timpul folosit la SORTARE: o data din viitor (eroare de sursa) e adusa la "acum",
+  // ca sa nu ramana fixata permanent in capul listei, inaintea stirilor reale mai proaspete.
+  function effectiveTimestamp(dateStr) {
+    const parsed = new Date(dateStr).getTime();
+    if (isNaN(parsed)) return 0;
+    return Math.min(parsed, Date.now());
   }
 
   function formatFullDate(dateStr) {
@@ -940,7 +948,7 @@
       const data = await res.json();
 
       sourceMeta = data.sources || [];
-      allItems = (data.items || []).filter(i => i.title && i.link).sort((a, b) => new Date(b.date) - new Date(a.date));
+      allItems = (data.items || []).filter(i => i.title && i.link).sort((a, b) => effectiveTimestamp(b.date) - effectiveTimestamp(a.date));
 
       history.replaceState({ view: 'list' }, '');
       renderSourceChecklist();
