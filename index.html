@@ -99,6 +99,19 @@
     color: var(--ink-soft);
   }
 
+  .offline-download-btn {
+    all: unset;
+    display: inline-block;
+    margin: 0.4rem 0 0;
+    font-size: 0.75rem;
+    color: var(--teal);
+    cursor: pointer;
+    border-bottom: 1px dotted var(--teal);
+    line-height: 1.2;
+  }
+  .offline-download-btn:hover { opacity: 0.8; }
+  .offline-download-btn:disabled { opacity: 0.5; cursor: default; }
+
   .offline-status {
     margin: 0.3rem 0 0;
     font-size: 0.75rem;
@@ -481,6 +494,7 @@
       <div>
         <p class="wordmark">Știri în neștire</p>
         <p class="tagline">Titluri, rapid. Fără reclame, fără zgomot.</p>
+        <button class="offline-download-btn" id="offlineDownloadBtn">⬇ Descarcă pentru offline</button>
         <p class="offline-status" id="offlineStatus"></p>
       </div>
       <div class="header-actions">
@@ -787,6 +801,7 @@
     document.getElementById('favoritesBtn').addEventListener('click', () => {
       navigateToFavorites();
     });
+    document.getElementById('offlineDownloadBtn').addEventListener('click', downloadOfflineArticles);
 
     document.getElementById('searchBtn').addEventListener('click', () => {
       const bar = document.getElementById('searchBar');
@@ -972,21 +987,32 @@
     } catch { return []; }
   }
 
-  // Descarca automat, in fundal, textul articolelor din sectiunea curent selectata,
-  // fara poze (doar text - cat mai usor). Sare peste ce e deja descarcat, ca sa nu
-  // reia acelasi lucru la fiecare vizita.
-  async function autoDownloadOffline() {
-    const pool = poolItems();
-    if (pool.length === 0) return;
-    const cachedKeys = new Set(await offlineGetAllKeys());
-    const toDownload = pool.filter(i => !cachedKeys.has(i.link)).slice(0, 40);
-    if (toDownload.length === 0) return;
-
+  // Descarca, la cerere (buton), textul articolelor din sectiunea curent
+  // selectata, fara poze (doar text - cat mai usor). Sare peste ce e deja
+  // descarcat, ca sa nu reia acelasi lucru de fiecare data.
+  async function downloadOfflineArticles() {
+    const btn = document.getElementById('offlineDownloadBtn');
     const statusEl = document.getElementById('offlineStatus');
     const setStatus = text => {
       statusEl.textContent = text;
       statusEl.classList.toggle('visible', Boolean(text));
     };
+
+    const pool = poolItems();
+    if (pool.length === 0) {
+      setStatus('Nimic de descărcat momentan.');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    const cachedKeys = new Set(await offlineGetAllKeys());
+    const toDownload = pool.filter(i => !cachedKeys.has(i.link)).slice(0, 40);
+    if (toDownload.length === 0) {
+      setStatus('Ai deja tot descărcat pentru offline.');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+
+    if (btn) btn.disabled = true;
     setStatus(`Se pregătesc ${toDownload.length} articole pentru offline…`);
 
     let done = 0;
@@ -1004,7 +1030,9 @@
       }
     }
     await Promise.all([worker(), worker(), worker()]); // 3 cereri simultane
-    setStatus('');
+    setStatus(`Gata — ${toDownload.length} articole salvate pentru offline.`);
+    setTimeout(() => setStatus(''), 3000);
+    if (btn) btn.disabled = false;
   }
 
   const CATEGORY_LABELS = {
@@ -1383,7 +1411,6 @@
       renderTabs();
       renderSourceChips();
       renderList();
-      autoDownloadOffline();
     } catch (err) {
       // Fara conexiune la pornire: aratam ultima lista salvata local, daca exista,
       // in loc de o eroare goala - util cand redeschizi aplicatia fara semnal (ex. in avion).
