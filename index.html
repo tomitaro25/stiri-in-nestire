@@ -242,6 +242,7 @@
 
   /* Source tabs */
   nav.tabs {
+    position: relative;
     display: flex;
     gap: 0.25rem;
     padding: 0.75rem 1rem;
@@ -250,6 +251,7 @@
   }
 
   nav.tabs-sub {
+    position: relative;
     display: none;
     gap: 0.25rem;
     padding: 0.5rem 1rem;
@@ -268,7 +270,7 @@
     font-size: 0.875rem;
     padding: 0.44rem 0.9rem;
     border-radius: 999px;
-    cursor: grab;
+    cursor: pointer;
     white-space: nowrap;
     user-select: none;
     -webkit-user-select: none;
@@ -280,6 +282,18 @@
     position: relative;
     z-index: 20;
   }
+
+  .tab-drop-indicator {
+    position: absolute;
+    top: 0.35rem;
+    bottom: 0.35rem;
+    width: 3px;
+    background: var(--nav-highlight);
+    border-radius: 2px;
+    pointer-events: none;
+    display: none;
+  }
+  .tab-drop-indicator.visible { display: block; }
 
   .tab-sub {
     font-size: 0.78rem;
@@ -1217,15 +1231,22 @@
   }
 
   // Reordonare prin tragere (mouse + atingere, via Pointer Events). Fiecare
-  // copil al containerului trebuie sa aiba deja un data-dnd-id. La final,
-  // onReorder(noileIdUri) e apelat ca sa persistam noua ordine.
+  // copil al containerului trebuie sa aiba deja un data-dnd-id. Cat timp tragi,
+  // NIMIC altceva nu se misca - doar apare o linie subtire care arata unde ar
+  // ateriza elementul. Reordonarea reala (mutarea in DOM + onReorder) se
+  // intampla o singura data, la eliberare.
   function makeSortable(container, onReorder) {
     let suppressClick = false;
     container.addEventListener('click', e => {
       if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; }
     }, true);
 
-    Array.from(container.children).forEach(el => {
+    const indicator = document.createElement('div');
+    indicator.className = 'tab-drop-indicator';
+    container.appendChild(indicator);
+
+    const items = Array.from(container.children).filter(el => el !== indicator);
+    items.forEach(el => {
       el.style.touchAction = 'pan-y'; // lasam scroll-ul vertical al paginii sa treaca; doar mutarea orizontala devine drag
       el.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1233,11 +1254,40 @@
         const startX = e.clientX;
         const pointerId = e.pointerId;
         let dragging = false;
+        let dropIndex = null;
+
+        function siblings() {
+          return Array.from(container.children).filter(c => c !== dragEl && c !== indicator);
+        }
+        function computeDropIndex(clientX) {
+          const sibs = siblings();
+          for (let i = 0; i < sibs.length; i++) {
+            const rect = sibs[i].getBoundingClientRect();
+            if (clientX < rect.left + rect.width / 2) return i;
+          }
+          return sibs.length;
+        }
+        function showIndicatorAt(index) {
+          const sibs = siblings();
+          const containerRect = container.getBoundingClientRect();
+          let x;
+          if (sibs.length === 0) {
+            x = container.scrollLeft;
+          } else if (index >= sibs.length) {
+            const rect = sibs[sibs.length - 1].getBoundingClientRect();
+            x = rect.right - containerRect.left + container.scrollLeft;
+          } else {
+            const rect = sibs[index].getBoundingClientRect();
+            x = rect.left - containerRect.left + container.scrollLeft;
+          }
+          indicator.style.left = `${x - 2}px`;
+          indicator.classList.add('visible');
+        }
 
         function onMove(ev) {
           if (ev.pointerId !== pointerId) return;
           const dx = ev.clientX - startX;
-          if (!dragging && Math.abs(dx) > 10) {
+          if (!dragging && Math.abs(dx) > 14) {
             dragging = true;
             suppressClick = true;
             dragEl.classList.add('dragging');
@@ -1246,30 +1296,29 @@
           if (!dragging) return;
           ev.preventDefault();
           dragEl.style.transform = `translateX(${dx}px)`;
-
-          const dragRect = dragEl.getBoundingClientRect();
-          const dragCenter = dragRect.left + dragRect.width / 2;
-          const children = Array.from(container.children);
-          const dragIndex = children.indexOf(dragEl);
-          for (let i = 0; i < children.length; i++) {
-            const sib = children[i];
-            if (sib === dragEl) continue;
-            const rect = sib.getBoundingClientRect();
-            const sibCenter = rect.left + rect.width / 2;
-            if (i < dragIndex && dragCenter < sibCenter) { container.insertBefore(dragEl, sib); break; }
-            if (i > dragIndex && dragCenter > sibCenter) { container.insertBefore(dragEl, sib.nextSibling); break; }
-          }
+          dropIndex = computeDropIndex(ev.clientX);
+          showIndicatorAt(dropIndex);
         }
         function onUp(ev) {
           if (ev.pointerId !== pointerId) return;
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
           window.removeEventListener('pointercancel', onUp);
+          indicator.classList.remove('visible');
           if (dragging) {
             dragEl.style.transform = '';
             dragEl.classList.remove('dragging');
             try { dragEl.releasePointerCapture(pointerId); } catch {}
-            onReorder(Array.from(container.children).map(c => c.dataset.dndId));
+
+            if (dropIndex !== null) {
+              const sibs = siblings();
+              if (dropIndex >= sibs.length) {
+                container.insertBefore(dragEl, indicator);
+              } else {
+                container.insertBefore(dragEl, sibs[dropIndex]);
+              }
+            }
+            onReorder(Array.from(container.children).filter(c => c !== indicator).map(c => c.dataset.dndId));
           }
         }
         window.addEventListener('pointermove', onMove);
