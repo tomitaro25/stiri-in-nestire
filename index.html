@@ -145,18 +145,21 @@
   /* Pagina de setari (randata in #main, ca si vizualizarea unui articol) */
   .settings-page { padding: 0.5rem 1.25rem 3.75rem; }
 
-  .settings-group { margin-bottom: 1.3rem; }
+  .settings-group { margin-bottom: 0.85rem; }
   .settings-group:last-child { margin-bottom: 0; }
 
   .settings-label {
-    font-size: 0.8rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
     color: var(--ink-soft);
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.35rem;
   }
 
   .segmented {
     display: flex;
-    gap: 0.35rem;
+    gap: 0.3rem;
     flex-wrap: wrap;
   }
 
@@ -166,8 +169,8 @@
     background: transparent;
     color: var(--ink);
     font-family: inherit;
-    font-size: 0.82rem;
-    padding: 0.4rem 0.7rem;
+    font-size: 0.76rem;
+    padding: 0.3rem 0.6rem;
     border-radius: 999px;
     cursor: pointer;
   }
@@ -180,11 +183,11 @@
   .shade-swatch {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
   }
   .shade-dot {
-    width: 0.85rem;
-    height: 0.85rem;
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 50%;
     border: 1px solid var(--rule);
   }
@@ -625,7 +628,7 @@
     mainEl.innerHTML = `
       <div class="settings-page">
         <button class="back-btn" id="backBtn">Înapoi la titluri</button>
-        <h1 class="reading-title" style="margin-bottom:1.3rem;">Setări</h1>
+        <h1 class="reading-title" style="margin-bottom:0.9rem;">Setări</h1>
 
         <div class="settings-group">
           <p class="settings-label">Temă</p>
