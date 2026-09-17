@@ -195,16 +195,16 @@
     border-color: var(--ink);
   }
 
-  .shade-swatch {
+  #shadeGroup button {
+    padding: 0.35rem;
     display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
   }
   .shade-dot {
-    width: 0.75rem;
-    height: 0.75rem;
+    width: 1.15rem;
+    height: 1.15rem;
     border-radius: 50%;
     border: 1px solid var(--rule);
+    display: block;
   }
 
   .settings-row {
@@ -268,8 +268,17 @@
     font-size: 0.875rem;
     padding: 0.44rem 0.9rem;
     border-radius: 999px;
-    cursor: pointer;
+    cursor: grab;
     white-space: nowrap;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .tab.dragging {
+    cursor: grabbing;
+    opacity: 0.65;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    position: relative;
+    z-index: 20;
   }
 
   .tab-sub {
@@ -331,9 +340,14 @@
   }
   .nav-btn:not(:disabled):hover { background: var(--paper-raised); }
 
-  .font-size-slider {
+  .font-size-label {
     margin-left: auto;
-    width: 4.5rem;
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .font-size-slider {
+    width: 4rem;
     accent-color: var(--teal);
     cursor: pointer;
   }
@@ -531,7 +545,8 @@
     <nav class="nav-bar" id="navBarTop">
       <button class="nav-btn" id="backBtnTop" aria-label="Înapoi">← Înapoi</button>
       <button class="nav-btn" id="forwardBtnTop" aria-label="Înainte">Înainte →</button>
-      <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="5" step="1" aria-label="Mărime text">
+      <span class="font-size-label">Font</span>
+      <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="5" step="1" aria-label="Mărime font">
     </nav>
 
     <nav class="tabs" id="tabs"></nav>
@@ -543,7 +558,8 @@
     <nav class="nav-bar" id="navBarBottom">
       <button class="nav-btn" id="backBtnBottom" aria-label="Înapoi">← Înapoi</button>
       <button class="nav-btn" id="forwardBtnBottom" aria-label="Înainte">Înainte →</button>
-      <input type="range" class="font-size-slider" id="fontSizeSliderBottom" min="1" max="5" step="1" aria-label="Mărime text">
+      <span class="font-size-label">Font</span>
+      <input type="range" class="font-size-slider" id="fontSizeSliderBottom" min="1" max="5" step="1" aria-label="Mărime font">
     </nav>
 
     <div class="update-banner" id="updateBanner">
@@ -591,7 +607,9 @@
     fontSize: '2',
     fontFamily: 'classic',
     shade: 'default',
-    selectedSources: null // null = toate sursele descoperite
+    selectedSources: null, // null = toate sursele descoperite
+    categoryOrder: null, // null = ordinea implicita (CATEGORY_ORDER); altfel, ordine aleasa de utilizator prin drag&drop
+    sourceOrder: null // null = ordinea implicita (descoperire); altfel, ordine aleasa de utilizator prin drag&drop
   };
 
   function loadSettings() {
@@ -726,8 +744,10 @@
     SHADE_PRESETS.forEach(preset => {
       const btn = document.createElement('button');
       btn.dataset.value = preset.id;
+      btn.title = preset.label;
+      btn.setAttribute('aria-label', preset.label);
       const previewColor = resolvedTheme() === 'dark' ? preset.dark : preset.light;
-      btn.innerHTML = `<span class="shade-swatch"><span class="shade-dot" style="background:${previewColor}"></span>${preset.label}</span>`;
+      btn.innerHTML = `<span class="shade-dot" style="background:${previewColor}"></span>`;
       shadeGroup.appendChild(btn);
     });
     wireSegmented(shadeGroup, settings.shade, value => {
@@ -1187,17 +1207,94 @@
     return items;
   }
 
+  // Aplica o ordine aleasa de utilizator (prin drag&drop) peste o lista de
+  // elemente; elementele care nu apar in ordinea salvata raman la coada,
+  // in ordinea lor naturala.
+  function applyCustomOrder(items, orderArray, keyFn) {
+    if (!orderArray || orderArray.length === 0) return items;
+    const indexOf = id => { const i = orderArray.indexOf(id); return i === -1 ? Infinity : i; };
+    return [...items].sort((a, b) => indexOf(keyFn(a)) - indexOf(keyFn(b)));
+  }
+
+  // Reordonare prin tragere (mouse + atingere, via Pointer Events). Fiecare
+  // copil al containerului trebuie sa aiba deja un data-dnd-id. La final,
+  // onReorder(noileIdUri) e apelat ca sa persistam noua ordine.
+  function makeSortable(container, onReorder) {
+    let suppressClick = false;
+    container.addEventListener('click', e => {
+      if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; }
+    }, true);
+
+    Array.from(container.children).forEach(el => {
+      el.style.touchAction = 'pan-y'; // lasam scroll-ul vertical al paginii sa treaca; doar mutarea orizontala devine drag
+      el.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        const dragEl = el;
+        const startX = e.clientX;
+        const pointerId = e.pointerId;
+        let dragging = false;
+
+        function onMove(ev) {
+          if (ev.pointerId !== pointerId) return;
+          const dx = ev.clientX - startX;
+          if (!dragging && Math.abs(dx) > 10) {
+            dragging = true;
+            suppressClick = true;
+            dragEl.classList.add('dragging');
+            try { dragEl.setPointerCapture(pointerId); } catch {}
+          }
+          if (!dragging) return;
+          ev.preventDefault();
+          dragEl.style.transform = `translateX(${dx}px)`;
+
+          const dragRect = dragEl.getBoundingClientRect();
+          const dragCenter = dragRect.left + dragRect.width / 2;
+          const children = Array.from(container.children);
+          const dragIndex = children.indexOf(dragEl);
+          for (let i = 0; i < children.length; i++) {
+            const sib = children[i];
+            if (sib === dragEl) continue;
+            const rect = sib.getBoundingClientRect();
+            const sibCenter = rect.left + rect.width / 2;
+            if (i < dragIndex && dragCenter < sibCenter) { container.insertBefore(dragEl, sib); break; }
+            if (i > dragIndex && dragCenter > sibCenter) { container.insertBefore(dragEl, sib.nextSibling); break; }
+          }
+        }
+        function onUp(ev) {
+          if (ev.pointerId !== pointerId) return;
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+          if (dragging) {
+            dragEl.style.transform = '';
+            dragEl.classList.remove('dragging');
+            try { dragEl.releasePointerCapture(pointerId); } catch {}
+            onReorder(Array.from(container.children).map(c => c.dataset.dndId));
+          }
+        }
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+      });
+    });
+  }
+
   // ---- Randare taburi (categorii, selectie multipla) ----
   function renderTabs() {
     // O categorie apare in bara de taburi doar daca are cel putin o sursa activa
     // (sourcesInCategory stie deja regulile speciale: International exclude IT,
     // iar IT accepta si surse non-RO).
-    const categories = CATEGORY_ORDER.filter(c => sourcesInCategory(c).length > 0);
+    const categories = applyCustomOrder(
+      CATEGORY_ORDER.filter(c => sourcesInCategory(c).length > 0),
+      settings.categoryOrder,
+      c => c
+    );
 
     tabsEl.innerHTML = '';
     categories.forEach(cat => {
       const btn = document.createElement('button');
       btn.className = 'tab';
+      btn.dataset.dndId = cat;
       btn.textContent = CATEGORY_LABELS[cat] || cat;
       btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
       btn.addEventListener('click', () => {
@@ -1209,6 +1306,11 @@
       });
       tabsEl.appendChild(btn);
     });
+
+    makeSortable(tabsEl, newOrder => {
+      settings.categoryOrder = newOrder;
+      saveSettings(settings);
+    });
   }
 
   // ---- Randare rand secundar (surse individuale, selectie multipla) ----
@@ -1218,7 +1320,7 @@
       subTabsEl.classList.remove('visible');
       return;
     }
-    const sources = sourcesInActiveCategories();
+    const sources = applyCustomOrder(sourcesInActiveCategories(), settings.sourceOrder, s => s.name);
     if (sources.length <= 1) {
       subTabsEl.classList.remove('visible');
       return;
@@ -1228,6 +1330,7 @@
     sources.forEach(s => {
       const btn = document.createElement('button');
       btn.className = 'tab tab-sub';
+      btn.dataset.dndId = s.name;
       btn.textContent = s.name;
       btn.setAttribute('aria-pressed', String(activeSources.has(s.name)));
       btn.addEventListener('click', () => {
@@ -1236,6 +1339,12 @@
         renderList();
       });
       subTabsEl.appendChild(btn);
+    });
+
+    makeSortable(subTabsEl, newOrder => {
+      const prev = settings.sourceOrder || [];
+      settings.sourceOrder = [...newOrder, ...prev.filter(n => !newOrder.includes(n))];
+      saveSettings(settings);
     });
   }
 
