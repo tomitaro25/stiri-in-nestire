@@ -331,6 +331,13 @@
   }
   .nav-btn:not(:disabled):hover { background: var(--paper-raised); }
 
+  .font-size-slider {
+    margin-left: auto;
+    width: 4.5rem;
+    accent-color: var(--teal);
+    cursor: pointer;
+  }
+
   /* Lista de articole, cu poza mica optionala */
   main { flex: 1; padding: 0.25rem 0 calc(env(safe-area-inset-bottom, 0px) + 44px + 2.5rem); }
 
@@ -524,6 +531,7 @@
     <nav class="nav-bar" id="navBarTop">
       <button class="nav-btn" id="backBtnTop" aria-label="Înapoi">← Înapoi</button>
       <button class="nav-btn" id="forwardBtnTop" aria-label="Înainte">Înainte →</button>
+      <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="5" step="1" aria-label="Mărime text">
     </nav>
 
     <nav class="tabs" id="tabs"></nav>
@@ -535,6 +543,7 @@
     <nav class="nav-bar" id="navBarBottom">
       <button class="nav-btn" id="backBtnBottom" aria-label="Înapoi">← Înapoi</button>
       <button class="nav-btn" id="forwardBtnBottom" aria-label="Înainte">Înainte →</button>
+      <input type="range" class="font-size-slider" id="fontSizeSliderBottom" min="1" max="5" step="1" aria-label="Mărime text">
     </nav>
 
     <div class="update-banner" id="updateBanner">
@@ -623,6 +632,12 @@
 
     const themeColorMeta = document.getElementById('themeColorMeta');
     if (themeColorMeta) themeColorMeta.setAttribute('content', theme === 'dark' ? '#181B18' : '#2C5F63');
+
+    // Sincronizam ambele slidere de marime text (sus si jos) cu setarea curenta
+    const sliderTop = document.getElementById('fontSizeSliderTop');
+    const sliderBottom = document.getElementById('fontSizeSliderBottom');
+    if (sliderTop) sliderTop.value = settings.fontSize;
+    if (sliderBottom) sliderBottom.value = settings.fontSize;
   }
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -676,17 +691,6 @@
 
           <div class="settings-col">
             <div class="settings-group">
-              <p class="settings-label">Mărime text</p>
-              <div class="segmented" id="fontSizeGroup">
-                <button data-value="1">1x</button>
-                <button data-value="2">2x</button>
-                <button data-value="3">3x</button>
-                <button data-value="4">4x</button>
-                <button data-value="5">5x</button>
-              </div>
-            </div>
-
-            <div class="settings-group">
               <p class="settings-label">Nuanță text</p>
               <div class="segmented" id="shadeGroup"></div>
             </div>
@@ -704,9 +708,6 @@
 
     wireSegmented(document.getElementById('themeGroup'), settings.theme, value => {
       settings.theme = value; saveSettings(settings); applyVisualSettings();
-    });
-    wireSegmented(document.getElementById('fontSizeGroup'), settings.fontSize, value => {
-      settings.fontSize = value; saveSettings(settings); applyVisualSettings();
     });
 
     const fontFamilyGroup = document.getElementById('fontFamilyGroup');
@@ -822,6 +823,17 @@
       navigateToFavorites();
     });
     document.getElementById('offlineDownloadBtn').addEventListener('click', downloadOfflineArticles);
+
+    // Slider-ul de marime text - doua instante (sus/jos), tinute sincronizate
+    const sliderTop = document.getElementById('fontSizeSliderTop');
+    const sliderBottom = document.getElementById('fontSizeSliderBottom');
+    function onFontSizeInput(e) {
+      settings.fontSize = e.target.value;
+      saveSettings(settings);
+      applyVisualSettings(); // asta actualizeaza si valoarea celuilalt slider
+    }
+    sliderTop.addEventListener('input', onFontSizeInput);
+    sliderBottom.addEventListener('input', onFontSizeInput);
 
     document.getElementById('searchBtn').addEventListener('click', () => {
       const bar = document.getElementById('searchBar');
