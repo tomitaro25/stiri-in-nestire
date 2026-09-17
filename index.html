@@ -99,6 +99,14 @@
     color: var(--ink-soft);
   }
 
+  .offline-status {
+    margin: 0.3rem 0 0;
+    font-size: 0.75rem;
+    color: var(--teal);
+    display: none;
+  }
+  .offline-status.visible { display: block; }
+
   button.icon-btn {
     all: unset;
     cursor: pointer;
@@ -298,7 +306,7 @@
   main { flex: 1; padding: 0.25rem 0 calc(env(safe-area-inset-bottom, 0px) + 44px + 2.5rem); }
 
   ul.list { list-style: none; margin: 0; padding: 0; }
-  li.item { border-bottom: 1px solid var(--rule); }
+  li.item { border-bottom: 1px solid var(--rule); position: relative; }
 
   button.item-btn {
     all: unset;
@@ -306,12 +314,26 @@
     align-items: center;
     gap: 0.8rem;
     width: 100%;
-    padding: 1rem 1.25rem;
+    padding: 1rem 2.6rem 1rem 1.25rem;
     cursor: pointer;
     box-sizing: border-box;
   }
   button.item-btn:hover, button.item-btn:focus-visible { background: var(--paper-raised); }
   button.item-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+  .fav-star {
+    all: unset;
+    position: absolute;
+    top: 0.85rem;
+    right: 1rem;
+    cursor: pointer;
+    font-size: 1.15rem;
+    line-height: 1;
+    color: var(--rule);
+    padding: 0.2rem;
+  }
+  .fav-star.active { color: var(--nav-highlight); }
+  .fav-star:hover { color: var(--teal); }
 
   .item-thumb {
     flex: 0 0 auto;
@@ -331,6 +353,7 @@
     margin: 0 0 0.5rem;
     color: var(--ink);
   }
+  .item-title.is-read { color: var(--ink-soft); font-weight: 400; }
 
   .item-meta {
     display: flex;
@@ -354,6 +377,21 @@
     padding: 0.75rem 0;
   }
   button.back-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .reading-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .fav-star-reading {
+    all: unset;
+    cursor: pointer;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--rule);
+    padding: 0.4rem;
+  }
+  .fav-star-reading.active { color: var(--nav-highlight); }
 
   .reading-meta { font-size: 0.81rem; color: var(--ink-soft); margin-bottom: 0.6rem; }
 
@@ -440,8 +478,10 @@
       <div>
         <p class="wordmark">Știri în neștire</p>
         <p class="tagline">Titluri, rapid. Fără reclame, fără zgomot.</p>
+        <p class="offline-status" id="offlineStatus"></p>
       </div>
       <div class="header-actions">
+        <button class="icon-btn" id="favoritesBtn" aria-label="Favorite">★</button>
         <button class="icon-btn" id="searchBtn" aria-label="Caută" aria-expanded="false">🔍</button>
         <button class="icon-btn" id="settingsBtn" aria-label="Setări">⚙</button>
       </div>
@@ -485,6 +525,14 @@
   // ---- Configurare ----
   const WORKER_URL = 'https://stiri-proxy.tomaunguru.workers.dev/';
   const SETTINGS_KEY = 'stiriNestireSettings';
+  const LAST_FEED_KEY = 'stiriNestireLastFeed'; // instantaneu al ultimei liste incarcate cu succes, pt pornire offline
+
+  function saveLastFeedSnapshot() {
+    try { localStorage.setItem(LAST_FEED_KEY, JSON.stringify({ items: allItems, sources: sourceMeta })); } catch {}
+  }
+  function loadLastFeedSnapshot() {
+    try { return JSON.parse(localStorage.getItem(LAST_FEED_KEY) || 'null'); } catch { return null; }
+  }
 
   const SHADE_PRESETS = [
     { id: 'default', label: 'Standard', light: '#20241F', dark: '#ECE8DC' },
@@ -651,10 +699,90 @@
     renderSourceChecklist();
   }
 
+  // ---- Pagina de Favorite ----
+  function navigateToFavorites() {
+    history.pushState({ view: 'favorites' }, '');
+    hasForwardEntry = false;
+    renderFavoritesView();
+  }
+
+  function renderFavoritesView() {
+    currentView = 'favorites';
+    updateNavButtons();
+    window.scrollTo(0, 0);
+
+    mainEl.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'settings-page';
+    wrap.innerHTML = `
+      <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+      <h1 class="reading-title" style="margin-bottom:1rem;">Favorite</h1>`;
+    mainEl.appendChild(wrap);
+    document.getElementById('backBtn').addEventListener('click', goBackInApp);
+
+    if (favorites.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'state';
+      empty.textContent = 'Niciun articol favorit încă. Apasă pe steluță lângă un titlu ca să-l salvezi aici.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const ul = document.createElement('ul');
+    ul.className = 'list';
+    ul.style.margin = '0 -1.25rem'; // aliniaza cu marginile paginii, la fel ca lista principala
+
+    favorites.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'item';
+
+      const btn = document.createElement('button');
+      btn.className = 'item-btn';
+      if (item.image) {
+        const img = document.createElement('img');
+        img.className = 'item-thumb';
+        img.src = `${WORKER_URL}?image=${encodeURIComponent(item.image)}`;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.addEventListener('error', () => img.remove());
+        btn.appendChild(img);
+      }
+      const textWrap = document.createElement('div');
+      textWrap.className = 'item-text';
+      const title = document.createElement('p');
+      title.className = 'item-title' + (readLinks.has(item.link) ? ' is-read' : '');
+      title.textContent = item.title;
+      const meta = document.createElement('div');
+      meta.className = 'item-meta';
+      meta.innerHTML = `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>`;
+      textWrap.appendChild(title);
+      textWrap.appendChild(meta);
+      btn.appendChild(textWrap);
+      btn.addEventListener('click', () => navigateToArticle(item));
+
+      const star = document.createElement('button');
+      star.className = 'fav-star active';
+      star.setAttribute('aria-label', 'Scoate din favorite');
+      star.textContent = '★';
+      star.addEventListener('click', () => {
+        toggleFavorite(item);
+        renderFavoritesView(); // reafisam lista, fara elementul scos
+      });
+
+      li.appendChild(btn);
+      li.appendChild(star);
+      ul.appendChild(li);
+    });
+    wrap.appendChild(ul);
+  }
+
   // ---- Header: buton de cautare (butoanele statice, cablate o singura data) ----
   function initHeaderButtons() {
     document.getElementById('settingsBtn').addEventListener('click', () => {
       navigateToSettings();
+    });
+    document.getElementById('favoritesBtn').addEventListener('click', () => {
+      navigateToFavorites();
     });
 
     document.getElementById('searchBtn').addEventListener('click', () => {
@@ -752,9 +880,129 @@
   let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
   let activeCategories = new Set(['Actualitati']); // implicit: doar sectiunea Actualitati (Stiri)
   let activeSources = new Set(); // gol = toate sursele din categoriile active
-  let currentView = 'list'; // 'list' | 'article' - pentru butoanele inapoi/inainte proprii
+  let currentView = 'list'; // 'list' | 'article' | 'settings' | 'favorites'
   let hasForwardEntry = false;
   let searchQuery = ''; // cautare dupa cuvinte din titlu
+
+  // ---- Citite si Favorite (localStorage - liste mici, doar metadate) ----
+  const READ_KEY = 'stiriNestireRead';
+  const READ_CAP = 300; // pastram doar ultimele N, ca sa nu creasca la nesfarsit
+  const FAV_KEY = 'stiriNestireFavorites';
+
+  function loadReadLinks() {
+    try { return new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')); } catch { return new Set(); }
+  }
+  function saveReadLinks() {
+    try { localStorage.setItem(READ_KEY, JSON.stringify(Array.from(readLinks).slice(-READ_CAP))); } catch {}
+  }
+  let readLinks = loadReadLinks();
+  function markAsRead(link) {
+    if (readLinks.has(link)) return;
+    readLinks.add(link);
+    saveReadLinks();
+  }
+
+  function loadFavorites() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; }
+  }
+  function saveFavorites() {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch {}
+  }
+  let favorites = loadFavorites(); // [{link,title,source,date,image}]
+  function isFavorite(link) { return favorites.some(f => f.link === link); }
+  function toggleFavorite(item) {
+    const idx = favorites.findIndex(f => f.link === item.link);
+    if (idx >= 0) {
+      favorites.splice(idx, 1);
+    } else {
+      favorites.unshift({ link: item.link, title: item.title, source: item.source, date: item.date, image: item.image || null });
+    }
+    saveFavorites();
+  }
+
+  // ---- Cache offline pentru text de articole (IndexedDB - poate creste mult mai mult) ----
+  const OFFLINE_DB_NAME = 'stiriNestireOffline';
+  const OFFLINE_STORE = 'articles';
+
+  function openOfflineDB() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error('IndexedDB indisponibil')); return; }
+      const req = indexedDB.open(OFFLINE_DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(OFFLINE_STORE)) {
+          req.result.createObjectStore(OFFLINE_STORE, { keyPath: 'link' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function offlineGet(link) {
+    try {
+      const db = await openOfflineDB();
+      return await new Promise((resolve, reject) => {
+        const req = db.transaction(OFFLINE_STORE, 'readonly').objectStore(OFFLINE_STORE).get(link);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    } catch { return null; }
+  }
+  async function offlineSet(entry) {
+    try {
+      const db = await openOfflineDB();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(OFFLINE_STORE, 'readwrite');
+        tx.objectStore(OFFLINE_STORE).put(entry);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {}
+  }
+  async function offlineGetAllKeys() {
+    try {
+      const db = await openOfflineDB();
+      return await new Promise((resolve, reject) => {
+        const req = db.transaction(OFFLINE_STORE, 'readonly').objectStore(OFFLINE_STORE).getAllKeys();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    } catch { return []; }
+  }
+
+  // Descarca automat, in fundal, textul articolelor din sectiunea curent selectata,
+  // fara poze (doar text - cat mai usor). Sare peste ce e deja descarcat, ca sa nu
+  // reia acelasi lucru la fiecare vizita.
+  async function autoDownloadOffline() {
+    const pool = poolItems();
+    if (pool.length === 0) return;
+    const cachedKeys = new Set(await offlineGetAllKeys());
+    const toDownload = pool.filter(i => !cachedKeys.has(i.link)).slice(0, 40);
+    if (toDownload.length === 0) return;
+
+    const statusEl = document.getElementById('offlineStatus');
+    const setStatus = text => {
+      statusEl.textContent = text;
+      statusEl.classList.toggle('visible', Boolean(text));
+    };
+    setStatus(`Se pregătesc ${toDownload.length} articole pentru offline…`);
+
+    let done = 0;
+    let idx = 0;
+    async function worker() {
+      while (idx < toDownload.length) {
+        const item = toDownload[idx++];
+        try {
+          const res = await fetch(`${WORKER_URL}?article=${encodeURIComponent(item.link)}`);
+          const data = await res.json();
+          await offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text || '', cachedAt: Date.now() });
+        } catch {}
+        done++;
+        setStatus(`Se pregătesc articole pentru offline… (${done}/${toDownload.length})`);
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]); // 3 cereri simultane
+    setStatus('');
+  }
 
   const CATEGORY_LABELS = {
     Actualitati: 'Actualități',
@@ -777,6 +1025,16 @@
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
     return TAG_PALETTE[hash % TAG_PALETTE.length];
+  }
+
+  // O sursa poate raporta o data din viitor (eroare/programare editoriala, ex.
+  // Ziarul Lumina foloseste data editiei tiparite de duminica pentru tot ce
+  // publica online in cursul saptamanii). Nu avem cum sa aflam ora reala de
+  // publicare in cazul asta, asa ca preferam sa n-o afisam deloc, in loc sa
+  // aratam o ora gresita.
+  function isFutureDate(dateStr) {
+    const parsed = new Date(dateStr).getTime();
+    return !isNaN(parsed) && parsed > Date.now();
   }
 
   function formatRelativeTime(dateStr) {
@@ -951,19 +1209,32 @@
       textWrap.className = 'item-text';
 
       const title = document.createElement('p');
-      title.className = 'item-title';
+      title.className = 'item-title' + (readLinks.has(item.link) ? ' is-read' : '');
       title.textContent = item.title;
 
       const meta = document.createElement('div');
       meta.className = 'item-meta';
-      meta.innerHTML = `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span><span>·</span><span>${formatRelativeTime(item.date)}</span>`;
+      meta.innerHTML = isFutureDate(item.date)
+        ? `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>`
+        : `<span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span><span>·</span><span>${formatRelativeTime(item.date)}</span>`;
 
       textWrap.appendChild(title);
       textWrap.appendChild(meta);
       btn.appendChild(textWrap);
       btn.addEventListener('click', () => navigateToArticle(item));
 
+      const star = document.createElement('button');
+      star.className = 'fav-star' + (isFavorite(item.link) ? ' active' : '');
+      star.setAttribute('aria-label', 'Favorit');
+      star.textContent = isFavorite(item.link) ? '★' : '☆';
+      star.addEventListener('click', () => {
+        toggleFavorite(item);
+        star.classList.toggle('active');
+        star.textContent = isFavorite(item.link) ? '★' : '☆';
+      });
+
       li.appendChild(btn);
+      li.appendChild(star);
       ul.appendChild(li);
     });
 
@@ -974,54 +1245,82 @@
 
   // ---- Vizualizare articol ----
   function navigateToArticle(item) {
-    history.pushState({ view: 'article', link: item.link }, '');
+    history.pushState({ view: 'article', item }, '');
     hasForwardEntry = false; // o navigare noua taie orice ramura de "inainte" existenta
     renderArticleView(item);
+  }
+
+  function readingHeaderHtml(item) {
+    return `
+      <div class="reading-header">
+        <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+        <button class="fav-star-reading${isFavorite(item.link) ? ' active' : ''}" id="favStarReading" aria-label="Favorit">${isFavorite(item.link) ? '★' : '☆'}</button>
+      </div>`;
+  }
+  function wireReadingHeader(item) {
+    document.getElementById('backBtn').addEventListener('click', goBackInApp);
+    const star = document.getElementById('favStarReading');
+    star.addEventListener('click', () => {
+      toggleFavorite(item);
+      star.classList.toggle('active');
+      star.textContent = isFavorite(item.link) ? '★' : '☆';
+    });
   }
 
   async function renderArticleView(item) {
     currentView = 'article';
     updateNavButtons();
     window.scrollTo(0, 0);
+    markAsRead(item.link);
 
     mainEl.innerHTML = `
       <div class="reading">
-        <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+        ${readingHeaderHtml(item)}
         <div class="state">Se încarcă articolul…</div>
       </div>`;
-    document.getElementById('backBtn').addEventListener('click', goBackInApp);
+    wireReadingHeader(item);
+
+    function renderBody(text, offlineNotice) {
+      const paragraphs = (text || '')
+        .split('\n\n')
+        .filter(p => p.trim())
+        .map(p => `<p>${escapeHtml(p)}</p>`)
+        .join('');
+      mainEl.innerHTML = `
+        <div class="reading">
+          ${readingHeaderHtml(item)}
+          <p class="reading-meta"><span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>${isFutureDate(item.date) ? '' : ` · ${formatFullDate(item.date)}`}</p>
+          <h1 class="reading-title">${escapeHtml(item.title)}</h1>
+          ${offlineNotice ? `<p class="offline-status visible" style="margin-bottom:1rem;">${offlineNotice}</p>` : ''}
+          <div class="reading-body">${paragraphs || '<p>Nu am putut extrage textul acestui articol.</p>'}</div>
+          <a class="reading-source-link" href="${item.link}" target="_blank" rel="noopener">Vezi articolul original</a>
+        </div>`;
+      wireReadingHeader(item);
+    }
 
     try {
       const res = await fetch(`${WORKER_URL}?article=${encodeURIComponent(item.link)}`);
       if (!res.ok) throw new Error('Răspuns invalid de la server');
       const data = await res.json();
-
-      const paragraphs = (data.text || '')
-        .split('\n\n')
-        .filter(p => p.trim())
-        .map(p => `<p>${escapeHtml(p)}</p>`)
-        .join('');
-
-      mainEl.innerHTML = `
-        <div class="reading">
-          <button class="back-btn" id="backBtn">Înapoi la titluri</button>
-          <p class="reading-meta"><span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span> · ${formatFullDate(item.date)}</p>
-          <h1 class="reading-title">${escapeHtml(item.title)}</h1>
-          <div class="reading-body">${paragraphs || '<p>Nu am putut extrage textul acestui articol.</p>'}</div>
-          <a class="reading-source-link" href="${item.link}" target="_blank" rel="noopener">Vezi articolul original</a>
-        </div>`;
-      document.getElementById('backBtn').addEventListener('click', goBackInApp);
+      renderBody(data.text);
+      offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text || '', cachedAt: Date.now() });
     } catch (err) {
+      // Fara conexiune (sau eroare de retea) - incercam varianta salvata offline, daca exista
+      const cached = await offlineGet(item.link);
+      if (cached && cached.text) {
+        renderBody(cached.text, 'Text disponibil offline (salvat anterior).');
+        return;
+      }
       mainEl.innerHTML = `
         <div class="reading">
-          <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+          ${readingHeaderHtml(item)}
           <div class="state">
             <strong>Nu am putut încărca articolul</strong>
-            A apărut o problemă la extragerea textului. Poți încerca din nou sau deschide articolul original.
+            A apărut o problemă la extragerea textului (posibil fără conexiune, iar articolul nu era salvat offline). Poți încerca din nou sau deschide articolul original.
             <br><a class="reading-source-link" href="${item.link}" target="_blank" rel="noopener">Vezi articolul original</a>
           </div>
         </div>`;
-      document.getElementById('backBtn').addEventListener('click', goBackInApp);
+      wireReadingHeader(item);
     }
   }
 
@@ -1043,12 +1342,9 @@
 
   window.addEventListener('popstate', event => {
     const state = event.state;
-    if (state && state.view === 'article') {
+    if (state && state.view === 'article' && state.item) {
       hasForwardEntry = false;
-      const item = allItems.find(i => i.link === state.link);
-      if (item) { renderArticleView(item); return; }
-      // linkul nu mai e in lista curenta (rar) - revenim in siguranta la lista
-      renderList();
+      renderArticleView(state.item);
       return;
     }
     if (state && state.view === 'settings') {
@@ -1056,8 +1352,13 @@
       renderSettingsView();
       return;
     }
+    if (state && state.view === 'favorites') {
+      hasForwardEntry = false;
+      renderFavoritesView();
+      return;
+    }
     const wasSubPage = currentView !== 'list';
-    hasForwardEntry = wasSubPage; // tocmai am revenit DE la un articol/setari, deci exista o ramura "inainte"
+    hasForwardEntry = wasSubPage; // tocmai am revenit DE la un articol/setari/favorite, deci exista o ramura "inainte"
     renderList();
   });
 
@@ -1073,12 +1374,29 @@
 
       sourceMeta = data.sources || [];
       allItems = (data.items || []).filter(i => i.title && i.link).sort((a, b) => effectiveTimestamp(b.date) - effectiveTimestamp(a.date));
+      saveLastFeedSnapshot();
 
       history.replaceState({ view: 'list' }, '');
       renderTabs();
       renderSourceChips();
       renderList();
+      autoDownloadOffline();
     } catch (err) {
+      // Fara conexiune la pornire: aratam ultima lista salvata local, daca exista,
+      // in loc de o eroare goala - util cand redeschizi aplicatia fara semnal (ex. in avion).
+      const snapshot = loadLastFeedSnapshot();
+      if (snapshot && snapshot.items && snapshot.items.length > 0) {
+        sourceMeta = snapshot.sources || [];
+        allItems = snapshot.items;
+        history.replaceState({ view: 'list' }, '');
+        renderTabs();
+        renderSourceChips();
+        renderList();
+        const statusEl = document.getElementById('offlineStatus');
+        statusEl.textContent = 'Fără conexiune — se arată ultima listă salvată.';
+        statusEl.classList.add('visible');
+        return;
+      }
       mainEl.innerHTML = `
         <div class="state">
           <strong>Nu am putut încărca știrile</strong>
