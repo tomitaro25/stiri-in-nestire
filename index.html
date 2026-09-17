@@ -182,8 +182,8 @@
     background: transparent;
     color: var(--ink);
     font-family: inherit;
-    font-size: 0.76rem;
-    padding: 0.3rem 0.6rem;
+    font-size: 0.72rem;
+    padding: 0.26rem 0.5rem;
     border-radius: 999px;
     cursor: pointer;
   }
@@ -205,18 +205,29 @@
     border: 1px solid var(--rule);
   }
 
-  .source-checklist {
+  .settings-row {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    gap: 1.1rem;
+  }
+  .settings-col { flex: 1; min-width: 0; }
+
+  .source-checklist {
+    column-count: 2;
+    column-gap: 1.1rem;
+  }
+  .source-cat-group {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    margin-bottom: 0.7rem;
   }
   .source-check {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
   }
-  .source-check input { accent-color: var(--teal); width: 1.05rem; height: 1.05rem; }
+  .source-check input { accent-color: var(--teal); width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
 
   .select-all-btn {
     all: unset;
@@ -644,33 +655,39 @@
         <button class="back-btn" id="backBtn">Înapoi la titluri</button>
         <h1 class="reading-title" style="margin-bottom:0.9rem;">Setări</h1>
 
-        <div class="settings-group">
-          <p class="settings-label">Temă</p>
-          <div class="segmented" id="themeGroup">
-            <button data-value="light">Deschis</button>
-            <button data-value="dark">Întunecat</button>
-            <button data-value="system">Automat</button>
+        <div class="settings-row">
+          <div class="settings-col">
+            <div class="settings-group">
+              <p class="settings-label">Temă</p>
+              <div class="segmented" id="themeGroup">
+                <button data-value="light">Deschis</button>
+                <button data-value="dark">Întunecat</button>
+                <button data-value="system">Automat</button>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <p class="settings-label">Font</p>
+              <div class="segmented" id="fontFamilyGroup"></div>
+            </div>
           </div>
-        </div>
 
-        <div class="settings-group">
-          <p class="settings-label">Font</p>
-          <div class="segmented" id="fontFamilyGroup"></div>
-        </div>
+          <div class="settings-col">
+            <div class="settings-group">
+              <p class="settings-label">Mărime text</p>
+              <div class="segmented" id="fontSizeGroup">
+                <button data-value="small">Mic</button>
+                <button data-value="medium">Normal</button>
+                <button data-value="large">Mare</button>
+                <button data-value="xlarge">Foarte mare</button>
+              </div>
+            </div>
 
-        <div class="settings-group">
-          <p class="settings-label">Mărime text</p>
-          <div class="segmented" id="fontSizeGroup">
-            <button data-value="small">Mic</button>
-            <button data-value="medium">Normal</button>
-            <button data-value="large">Mare</button>
-            <button data-value="xlarge">Foarte mare</button>
+            <div class="settings-group">
+              <p class="settings-label">Nuanță text</p>
+              <div class="segmented" id="shadeGroup"></div>
+            </div>
           </div>
-        </div>
-
-        <div class="settings-group">
-          <p class="settings-label">Nuanță text</p>
-          <div class="segmented" id="shadeGroup"></div>
         </div>
 
         <div class="settings-group">
@@ -836,14 +853,14 @@
     const discovered = sourceMeta.map(s => s.name);
     const effectiveSelected = settings.selectedSources || discovered;
 
-    function addHeading(text) {
+    function addHeading(parent, text) {
       const heading = document.createElement('p');
       heading.textContent = text;
-      heading.style.cssText = 'font-size:0.72rem;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;margin:0.7rem 0 0.3rem;';
-      container.appendChild(heading);
+      heading.style.cssText = 'font-size:0.72rem;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;margin:0 0 0.3rem;';
+      parent.appendChild(heading);
     }
 
-    function addSourceCheck(s) {
+    function addSourceCheck(parent, s) {
       const label = document.createElement('label');
       label.className = 'source-check';
       const checkbox = document.createElement('input');
@@ -862,7 +879,17 @@
       tagSpan.textContent = s.country; // RO, GB, DE, FR ...
       tagSpan.style.cssText = 'font-size:0.68rem;color:var(--ink-soft);border:1px solid var(--rule);border-radius:4px;padding:0.05rem 0.3rem;';
       label.appendChild(tagSpan);
-      container.appendChild(label);
+      parent.appendChild(label);
+    }
+
+    // Fiecare categorie devine propriul "grup", ca sa nu se rupa intre cele
+    // doua coloane (break-inside: avoid, in CSS) cand afisam totul pe 2 coloane.
+    function addCategoryGroup(heading, sources) {
+      const group = document.createElement('div');
+      group.className = 'source-cat-group';
+      addHeading(group, heading);
+      sources.forEach(s => addSourceCheck(group, s));
+      container.appendChild(group);
     }
 
     // 1. Grupare pe categorie: sursele romanesti, plus cele de la IT/Tech
@@ -874,15 +901,13 @@
       byCategory[cat].push(s);
     });
     Object.keys(byCategory).sort().forEach(cat => {
-      addHeading(CATEGORY_LABELS[cat] || cat);
-      byCategory[cat].forEach(addSourceCheck);
+      addCategoryGroup(CATEGORY_LABELS[cat] || cat, byCategory[cat]);
     });
 
     // 2. Restul surselor internationale (orice, in afara de IT/Tech), separat
     const international = sourceMeta.filter(s => s.country !== 'RO' && s.category !== 'IT');
     if (international.length > 0) {
-      addHeading('Internaționale');
-      international.forEach(addSourceCheck);
+      addCategoryGroup('Internaționale', international);
     }
 
     document.getElementById('selectAllBtn').onclick = () => {
