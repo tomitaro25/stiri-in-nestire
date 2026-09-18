@@ -1203,21 +1203,34 @@
   const CATEGORY_ORDER = ['Actualitati', 'Vremea', 'Sport', 'Financiar', 'IT', 'Religie', 'Cultura', 'International'];
 
   // 'Vremea' nu e o categorie legata de o sursa anume - e un filtru dupa cuvinte
-  // cheie in titlu, aplicat peste TOATE sursele active. Asa gasim stiri despre
-  // vreme/meteo/prognoze indiferent care sursa le-a publicat, fara sa fie nevoie
-  // sa cautam si sa intretinem surse dedicate doar pentru asta.
-  const WEATHER_KEYWORDS = [
-    'vreme', 'vremea', 'meteo', 'meteorolog', 'prognoza', 'prognoză',
-    'temperatur', 'canicul', 'caniculă', 'ger', 'îngheț', 'inghet',
-    'ninsoare', 'ninsori', 'zăpadă', 'zapada', 'viscol', 'polei',
-    'furtun', 'vijelie', 'grindin', 'tunete', 'descarcari electrice', 'descărcări electrice',
-    'cod galben', 'cod portocaliu', 'cod roșu', 'cod rosu', 'alerta meteo', 'alertă meteo',
-    'anm', 'val de caldura', 'val de căldură', 'seceta', 'secetă', 'inundaț', 'inundat',
-    'meteorologic'
+  // cheie in titlu, aplicat peste sursele de Actualitati generale (nu Sport,
+  // Religie, Financiar, IT sau Cultura - acolo vremea n-are ce cauta).
+  // Ca sa evitam fals-pozitive (ex. "vreme" insemnand si "timp", "furtuna"
+  // folosit metaforic despre scandaluri), cerem fie un semnal PUTERNIC de unul
+  // singur (ANM, cod rosu/portocaliu/galben, "fenomene meteo", viscol, canicula),
+  // fie cel putin DOUA semnale slabe impreuna (ploi, temperaturi, frig, etc.).
+  const WEATHER_STRONG = [
+    'anm', 'cod roșu', 'cod rosu', 'cod portocaliu', 'cod galben',
+    'prognoza meteo', 'prognoză meteo', 'fenomene meteo', 'alerta meteo', 'alertă meteo',
+    'viscol', 'canicul', 'ninsoare', 'ninsori', 'meteorolog',
+    'val de caldura', 'val de căldură'
   ];
+  const WEATHER_WEAK = [
+    'ploi', 'ploaie', 'vreme', 'vremea', 'temperatur', 'grade',
+    'racoare', 'răcoare', 'frig', 'caldura', 'căldură', 'meteo',
+    'seceta', 'secetă', 'inundaț', 'inundat', 'grindin', 'polei',
+    'zăpadă', 'zapada', 'îngheț', 'inghet', 'prognoza', 'prognoză'
+  ];
+  function isGeneralNewsSource(sourceName) {
+    const meta = sourceMeta.find(s => s.name === sourceName);
+    return Boolean(meta && meta.category === 'Actualitati');
+  }
   function isWeatherItem(item) {
+    if (!isGeneralNewsSource(item.source)) return false;
     const t = item.title.toLowerCase();
-    return WEATHER_KEYWORDS.some(k => t.includes(k));
+    if (WEATHER_STRONG.some(k => t.includes(k))) return true;
+    const weakHits = WEATHER_WEAK.filter(k => t.includes(k)).length;
+    return weakHits >= 2;
   }
   function hasWeatherItems() {
     const names = new Set(effectiveSources());
