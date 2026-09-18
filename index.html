@@ -299,6 +299,8 @@
     white-space: nowrap;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
   }
   .tab.dragging {
     cursor: grabbing;
@@ -1419,6 +1421,7 @@
 
     const items = Array.from(container.children).filter(el => el !== indicator);
     items.forEach(el => {
+      el.addEventListener('contextmenu', e => e.preventDefault()); // blocheaza meniul nativ de "apasare lunga" (Android/desktop)
       el.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         const dragEl = el;
