@@ -1393,20 +1393,13 @@
     return [...items].sort((a, b) => indexOf(keyFn(a)) - indexOf(keyFn(b)));
   }
 
-  // Reordonare prin tragere (mouse + atingere, via Pointer Events), cu
-  // comportamentul clasic de pe telefon:
-  // - o atingere scurta, fara miscare, selecteaza butonul (click normal)
-  // - o miscare rapida, din prima, deruleaza lista la stanga/dreapta (scroll
-  //   nativ al browserului - nu interferam deloc cu ea)
-  // - o apasare TINUTA pe loc ~450ms "ridica" butonul (cu o mica vibratie, daca
-  //   telefonul suporta) si abia apoi miscarea degetului reordoneaza
-  // Cat timp tragi, nimic altceva nu se muta - doar o linie subtire arata unde
-  // ar ateriza elementul; reordonarea reala se intampla o singura data, la
+  // Reordonare prin tragere (mouse + atingere, via Pointer Events). Cat timp
+  // tragi, nimic altceva nu se muta - doar o linie subtire arata unde ar
+  // ateriza elementul; reordonarea reala se intampla o singura data, la
   // eliberare. Daca tragi aproape de marginea vizibila, lista deruleaza singura
   // in acea directie, ca sa poti duce elementul si in afara ecranului curent.
   function makeSortable(container, onReorder) {
-    const LONG_PRESS_MS = 450;
-    const MOVE_CANCEL_PX = 8; // miscare peste care, INAINTE de apasarea lunga, consideram gestul un scroll
+    const MOVE_THRESHOLD_PX = 14;
     const EDGE_ZONE_PX = 40;
     const EDGE_SCROLL_STEP = 9;
 
@@ -1421,18 +1414,16 @@
 
     const items = Array.from(container.children).filter(el => el !== indicator);
     items.forEach(el => {
-      el.addEventListener('contextmenu', e => e.preventDefault()); // blocheaza meniul nativ de "apasare lunga" (Android/desktop)
+      el.style.touchAction = 'pan-y'; // lasam scroll-ul vertical al paginii sa treaca; doar mutarea orizontala devine drag
+      el.addEventListener('contextmenu', e => e.preventDefault());
       el.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         const dragEl = el;
         const startX = e.clientX;
-        const startY = e.clientY;
         const pointerId = e.pointerId;
         let dragging = false;
-        let armed = true; // devine false daca degetul se misca prea mult inainte sa treaca timpul de apasare lunga
         let dropIndex = null;
         let autoScrollTimer = null;
-        let lastClientX = e.clientX;
 
         function siblings() {
           return Array.from(container.children).filter(c => c !== dragEl && c !== indicator);
@@ -1461,7 +1452,6 @@
           indicator.style.left = `${x - 2}px`;
           indicator.classList.add('visible');
         }
-
         function updateAutoScroll(clientX) {
           const rect = container.getBoundingClientRect();
           clearInterval(autoScrollTimer);
@@ -1469,13 +1459,13 @@
           if (clientX < rect.left + EDGE_ZONE_PX) {
             autoScrollTimer = setInterval(() => {
               container.scrollLeft -= EDGE_SCROLL_STEP;
-              dropIndex = computeDropIndex(lastClientX);
+              dropIndex = computeDropIndex(clientX);
               showIndicatorAt(dropIndex);
             }, 16);
           } else if (clientX > rect.right - EDGE_ZONE_PX) {
             autoScrollTimer = setInterval(() => {
               container.scrollLeft += EDGE_SCROLL_STEP;
-              dropIndex = computeDropIndex(lastClientX);
+              dropIndex = computeDropIndex(clientX);
               showIndicatorAt(dropIndex);
             }, 16);
           }
@@ -1485,44 +1475,25 @@
           autoScrollTimer = null;
         }
 
-        function startDragging() {
-          dragging = true;
-          suppressClick = true;
-          dragEl.classList.add('dragging');
-          try { dragEl.setPointerCapture(pointerId); } catch {}
-          if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
-          dropIndex = computeDropIndex(lastClientX);
-          showIndicatorAt(dropIndex);
-        }
-
-        const longPressTimer = setTimeout(() => {
-          if (armed) startDragging();
-        }, LONG_PRESS_MS);
-
         function onMove(ev) {
           if (ev.pointerId !== pointerId) return;
-          lastClientX = ev.clientX;
-          const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
-
-          if (!dragging) {
-            // Inca asteptam apasarea lunga - daca degetul s-a miscat deja destul,
-            // e clar o intentie de scroll, nu de reordonare: renuntam la drag,
-            // NU chemam preventDefault, ca browserul sa poata derula normal.
-            if (armed && dist > MOVE_CANCEL_PX) {
-              armed = false;
-              clearTimeout(longPressTimer);
-            }
-            return;
+          const dx = ev.clientX - startX;
+          if (!dragging && Math.abs(dx) > MOVE_THRESHOLD_PX) {
+            dragging = true;
+            suppressClick = true;
+            dragEl.classList.add('dragging');
+            try { dragEl.setPointerCapture(pointerId); } catch {}
+            if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
           }
+          if (!dragging) return;
           ev.preventDefault();
-          dragEl.style.transform = `translateX(${ev.clientX - startX}px)`;
+          dragEl.style.transform = `translateX(${dx}px)`;
           dropIndex = computeDropIndex(ev.clientX);
           showIndicatorAt(dropIndex);
           updateAutoScroll(ev.clientX);
         }
         function onUp(ev) {
           if (ev.pointerId !== pointerId) return;
-          clearTimeout(longPressTimer);
           stopAutoScroll();
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
@@ -1550,6 +1521,7 @@
       });
     });
   }
+
 
   // ---- Randare taburi (categorii, selectie multipla) ----
   function renderTabs() {
