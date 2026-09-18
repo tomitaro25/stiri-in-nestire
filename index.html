@@ -159,8 +159,25 @@
 
   /* Pagina de setari (randata in #main, ca si vizualizarea unui articol) */
   .settings-page { padding: 0.5rem 1.25rem 3.75rem; }
-  .help-text p {
+  .help-link-btn {
+    all: unset;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    text-align: center;
+    cursor: pointer;
     font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--teal);
+    background: var(--paper-raised);
+    border: 1px solid var(--teal);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .help-link-btn:hover { background: var(--paper); }
+  .help-text p {
+    font-size: calc(0.88rem * var(--content-scale));
     line-height: 1.55;
     color: var(--ink);
     margin: 0 0 0.7rem;
@@ -549,7 +566,7 @@
     <header class="masthead">
       <div>
         <p class="wordmark">Știri în neștire</p>
-        <p class="tagline">Titluri, rapid. Fără reclame, fără zgomot.</p>
+        <p class="tagline">Fără cont, fără abonament. Fără reclame, fără zgomot.</p>
         <button class="offline-download-btn" id="offlineDownloadBtn">⬇ Descarcă pentru offline</button>
         <p class="offline-status" id="offlineStatus"></p>
       </div>
@@ -714,6 +731,8 @@
         <button class="back-btn" id="backBtn">Înapoi la titluri</button>
         <h1 class="reading-title" style="margin-bottom:0.9rem;">Setări</h1>
 
+        <button class="help-link-btn" id="helpLinkBtn">❓ Ajutor și informații despre aplicație</button>
+
         <div class="settings-row">
           <div class="settings-col">
             <div class="settings-group">
@@ -743,10 +762,6 @@
           <p class="settings-label">Surse afișate</p>
           <div class="source-checklist" id="sourceChecklist"></div>
           <button class="select-all-btn" id="selectAllBtn">Selectează tot</button>
-        </div>
-
-        <div class="settings-group">
-          <button class="select-all-btn" id="helpLinkBtn">Ajutor și informații despre aplicație →</button>
         </div>
       </div>`;
 
@@ -837,7 +852,7 @@
         <div class="settings-group">
           <p class="settings-label">Ce este și ce nu este acest site</p>
           <div class="help-text">
-            <p>„Știri în neștire" e un agregator personal de știri, construit ca proiect de învățare. Nu produce jurnalism propriu și nu garantează corectitudinea materialelor publicate de sursele externe. Rolul lui e doar să centralizeze titluri și să faciliteze descoperirea lor — pentru context complet și verificare, consultă întotdeauna articolul-sursă.</p>
+            <p>„Știri în neștire" e un agregator personal de știri. Nu produce jurnalism propriu și nu garantează corectitudinea materialelor publicate de sursele externe. Rolul lui e doar să centralizeze titluri și să faciliteze descoperirea lor — pentru context complet și verificare, consultă întotdeauna articolul-sursă.</p>
           </div>
         </div>
       </div>`;
@@ -1349,7 +1364,17 @@
     }
 
     if (activeSources.size > 0) {
-      items = items.filter(i => activeSources.has(i.source));
+      // Aplicam doar sursele din activeSources care apartin categoriilor curent
+      // active (sau, daca nu e nicio categorie activa, orice sursa efectiva).
+      // Restul raman memorate in activeSources, fara efect acum, dar gata sa
+      // redevina relevante daca utilizatorul reselecteaza categoria potrivita.
+      const validScope = activeCategories.size > 0
+        ? new Set(sourcesInActiveCategories().map(s => s.name))
+        : new Set(names);
+      const effectiveNarrow = new Set(Array.from(activeSources).filter(n => validScope.has(n)));
+      if (effectiveNarrow.size > 0) {
+        items = items.filter(i => effectiveNarrow.has(i.source));
+      }
     }
     if (searchQuery) {
       items = items.filter(i => i.title.toLowerCase().includes(searchQuery));
@@ -1485,7 +1510,10 @@
       btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
       btn.addEventListener('click', () => {
         if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
-        activeSources = new Set(); // schimbarea categoriilor reseteaza ingustarea pe surse individuale
+        // NU stergem activeSources aici - o ingustare facuta intr-o categorie ramane
+        // memorata chiar daca deselectezi si reselectezi categoria mai tarziu.
+        // poolItems() ignora, fara sa distruga, sursele care nu mai apartin
+        // categoriilor curent active.
         saveActiveFilters();
         renderTabs();
         renderSourceChips();
