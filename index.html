@@ -29,6 +29,8 @@
     --font-title: 'Source Serif 4', serif;
     --font-body: 'IBM Plex Sans', sans-serif;
     --content-scale: 1;
+    --navbar-top-h: 44px; /* inaltimea reala a barei fixe de sus - actualizata din JS */
+    --tabs-h: 45px; /* inaltimea reala a randului de taburi de categorii - actualizata din JS */
   }
 
   html[data-theme="dark"] {
@@ -89,16 +91,21 @@
   .wordmark {
     font-family: var(--font-title);
     font-weight: 700;
-    font-size: 1.7rem;
+    font-size: clamp(1.05rem, 5.8vw, 1.7rem);
     letter-spacing: -0.01em;
     margin: 0;
     line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   .tagline {
     margin: 0.35rem 0 0;
-    font-size: 0.85rem;
+    font-size: clamp(0.66rem, 2.6vw, 0.85rem);
     color: var(--ink-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .offline-download-btn {
@@ -267,7 +274,10 @@
 
   /* Source tabs */
   nav.tabs {
-    position: relative;
+    position: sticky;
+    top: var(--navbar-top-h, 44px);
+    z-index: 30;
+    background: var(--paper);
     display: flex;
     gap: 0.25rem;
     padding: 0.75rem 1rem;
@@ -276,7 +286,9 @@
   }
 
   nav.tabs-sub {
-    position: relative;
+    position: sticky;
+    top: calc(var(--navbar-top-h, 44px) + var(--tabs-h, 45px));
+    z-index: 29;
     display: none;
     gap: 0.25rem;
     padding: 0.5rem 1rem;
@@ -699,6 +711,8 @@
     const sliderBottom = document.getElementById('fontSizeSliderBottom');
     if (sliderTop) sliderTop.value = settings.fontSize;
     if (sliderBottom) sliderBottom.value = settings.fontSize;
+
+    if (typeof updateStickyOffsets === 'function') updateStickyOffsets(); // fontul poate schimba usor inaltimea taburilor
   }
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -1258,6 +1272,23 @@
   const subTabsEl = document.getElementById('subTabs');
   const mainEl = document.getElementById('main');
 
+  // Masoara inaltimile reale ale barei fixe de sus si ale randului de taburi de
+  // categorii, si le pune in variabile CSS - astfel randul de taburi si cel de
+  // surse (position: sticky) se lipesc exact sub bara fixa, indiferent de
+  // safe-area (notch) sau de cat de mare e fontul ales de utilizator.
+  function updateStickyOffsets() {
+    const navBarTop = document.getElementById('navBarTop');
+    if (navBarTop) {
+      document.documentElement.style.setProperty('--navbar-top-h', `${navBarTop.getBoundingClientRect().height}px`);
+    }
+    if (tabsEl && tabsEl.getBoundingClientRect().height > 0) {
+      document.documentElement.style.setProperty('--tabs-h', `${tabsEl.getBoundingClientRect().height}px`);
+    }
+  }
+  window.addEventListener('resize', updateStickyOffsets);
+  window.addEventListener('orientationchange', updateStickyOffsets);
+  window.addEventListener('load', updateStickyOffsets); // fonturile Google incarcate cu putin timp in urma pot schimba usor inaltimile
+
   // ---- Utilitare culoare pe sursă ----
   const TAG_PALETTE = ['#2C5F63', '#8B3E32', '#6B5B95', '#4C6E3C', '#8A6D1F', '#3D5A80'];
   function colorForSource(name) {
@@ -1544,6 +1575,11 @@
               }
             }
             onReorder(Array.from(container.children).filter(c => c !== indicator).map(c => c.dataset.dndId));
+            // Plasa de siguranta: pe atingere, dupa o tragere reala browserul de
+            // obicei NU mai trimite un eveniment "click" de finalizare - fara asta,
+            // suppressClick ar ramane blocat pe true si ar manca urmatoarea
+            // atingere reala a utilizatorului (exact bug-ul raportat).
+            setTimeout(() => { suppressClick = false; }, 60);
           }
         }
         window.addEventListener('pointermove', onMove);
@@ -1846,6 +1882,7 @@
       renderTabs();
       renderSourceChips();
       renderList();
+      updateStickyOffsets();
     } catch (err) {
       // Fara conexiune la pornire: aratam ultima lista salvata local, daca exista,
       // in loc de o eroare goala - util cand redeschizi aplicatia fara semnal (ex. in avion).
@@ -1857,6 +1894,7 @@
         renderTabs();
         renderSourceChips();
         renderList();
+        updateStickyOffsets();
         const statusEl = document.getElementById('offlineStatus');
         statusEl.textContent = 'Fără conexiune — se arată ultima listă salvată.';
         statusEl.classList.add('visible');
