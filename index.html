@@ -300,7 +300,7 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
-    touch-action: manipulation;
+    /* touch-action e setat din JS (touchAction='none'), ca sa preluam noi tot gestul */
   }
   .tab.dragging {
     cursor: grabbing;
@@ -1393,13 +1393,22 @@
     return [...items].sort((a, b) => indexOf(keyFn(a)) - indexOf(keyFn(b)));
   }
 
-  // Reordonare prin tragere (mouse + atingere, via Pointer Events). Cat timp
-  // tragi, nimic altceva nu se muta - doar o linie subtire arata unde ar
-  // ateriza elementul; reordonarea reala se intampla o singura data, la
-  // eliberare. Daca tragi aproape de marginea vizibila, lista deruleaza singura
-  // in acea directie, ca sa poti duce elementul si in afara ecranului curent.
+  // Reordonare prin tragere (mouse + atingere, via Pointer Events).
+  // Pe atingere, preluam controlul COMPLET al gestului chiar de la inceput
+  // (touch-action: none), ca sa nu se mai "lupte" cu scroll-ul nativ al
+  // browserului - problema reala din incercarile anterioare. Cat timp
+  // utilizatorul n-a apasat inca suficient de mult (LONG_PRESS_MS), orice
+  // miscare o interpretam noi insine ca scroll (mutam container.scrollLeft cu
+  // mana). Dupa ce trece apasarea lunga, fara sa se fi miscat mult, intram in
+  // modul de tragere (cu o mica vibratie, daca telefonul suporta) si abia
+  // atunci miscarea reordoneaza. O simpla atingere, fara sa astepti, ramane
+  // un tap normal de selectare. Cat timp tragi, nimic altceva nu se muta -
+  // doar o linie subtire arata unde ar ateriza elementul; reordonarea reala
+  // se intampla o singura data, la eliberare. Aproape de marginea vizibila,
+  // lista deruleaza singura, ca sa poti duce elementul si in afara ecranului.
   function makeSortable(container, onReorder) {
-    const MOVE_THRESHOLD_PX = 14;
+    const LONG_PRESS_MS = 400;
+    const SCROLL_INTENT_PX = 4; // miscare peste care, INAINTE de apasarea lunga, o tratam ca scroll
     const EDGE_ZONE_PX = 40;
     const EDGE_SCROLL_STEP = 9;
 
@@ -1414,16 +1423,20 @@
 
     const items = Array.from(container.children).filter(el => el !== indicator);
     items.forEach(el => {
-      el.style.touchAction = 'pan-y'; // lasam scroll-ul vertical al paginii sa treaca; doar mutarea orizontala devine drag
+      el.style.touchAction = 'none'; // preluam noi tot controlul gestului, de la primul pixel
       el.addEventListener('contextmenu', e => e.preventDefault());
       el.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         const dragEl = el;
         const startX = e.clientX;
+        const startScrollLeft = container.scrollLeft;
         const pointerId = e.pointerId;
         let dragging = false;
+        let scrolling = false; // s-a stabilit deja ca gestul asta e un scroll, nu o tragere
         let dropIndex = null;
         let autoScrollTimer = null;
+
+        try { dragEl.setPointerCapture(pointerId); } catch {}
 
         function siblings() {
           return Array.from(container.children).filter(c => c !== dragEl && c !== indicator);
@@ -1475,17 +1488,35 @@
           autoScrollTimer = null;
         }
 
+        function startDragging() {
+          if (scrolling) return;
+          dragging = true;
+          suppressClick = true;
+          dragEl.classList.add('dragging');
+          if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
+          dropIndex = computeDropIndex(startX);
+          showIndicatorAt(dropIndex);
+        }
+        const longPressTimer = setTimeout(startDragging, LONG_PRESS_MS);
+
         function onMove(ev) {
           if (ev.pointerId !== pointerId) return;
           const dx = ev.clientX - startX;
-          if (!dragging && Math.abs(dx) > MOVE_THRESHOLD_PX) {
-            dragging = true;
-            suppressClick = true;
-            dragEl.classList.add('dragging');
-            try { dragEl.setPointerCapture(pointerId); } catch {}
-            if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
+
+          if (!dragging) {
+            if (!scrolling && Math.abs(dx) > SCROLL_INTENT_PX) {
+              // Miscare clara inainte de apasarea lunga - utilizatorul vrea sa
+              // deruleze, nu sa mute butonul. Preluam noi scroll-ul cu mana,
+              // pentru ca touch-action:none a scos browserul din ecuatie.
+              scrolling = true;
+              clearTimeout(longPressTimer);
+            }
+            if (scrolling) {
+              ev.preventDefault();
+              container.scrollLeft = startScrollLeft - dx;
+            }
+            return;
           }
-          if (!dragging) return;
           ev.preventDefault();
           dragEl.style.transform = `translateX(${dx}px)`;
           dropIndex = computeDropIndex(ev.clientX);
@@ -1494,16 +1525,16 @@
         }
         function onUp(ev) {
           if (ev.pointerId !== pointerId) return;
+          clearTimeout(longPressTimer);
           stopAutoScroll();
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
           window.removeEventListener('pointercancel', onUp);
           indicator.classList.remove('visible');
+          try { dragEl.releasePointerCapture(pointerId); } catch {}
           if (dragging) {
             dragEl.style.transform = '';
             dragEl.classList.remove('dragging');
-            try { dragEl.releasePointerCapture(pointerId); } catch {}
-
             if (dropIndex !== null) {
               const sibs = siblings();
               if (dropIndex >= sibs.length) {
