@@ -159,6 +159,14 @@
 
   /* Pagina de setari (randata in #main, ca si vizualizarea unui articol) */
   .settings-page { padding: 0.5rem 1.25rem 3.75rem; }
+  .help-text p {
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--ink);
+    margin: 0 0 0.7rem;
+  }
+  .help-text p:last-child { margin-bottom: 0; }
+  .help-text strong { color: var(--ink); }
 
   .settings-group { margin-bottom: 0.85rem; }
   .settings-group:last-child { margin-bottom: 0; }
@@ -736,9 +744,14 @@
           <div class="source-checklist" id="sourceChecklist"></div>
           <button class="select-all-btn" id="selectAllBtn">Selectează tot</button>
         </div>
+
+        <div class="settings-group">
+          <button class="select-all-btn" id="helpLinkBtn">Ajutor și informații despre aplicație →</button>
+        </div>
       </div>`;
 
     document.getElementById('backBtn').addEventListener('click', goBackInApp);
+    document.getElementById('helpLinkBtn').addEventListener('click', navigateToHelp);
 
     wireSegmented(document.getElementById('themeGroup'), settings.theme, value => {
       settings.theme = value; saveSettings(settings); applyVisualSettings();
@@ -771,6 +784,65 @@
     });
 
     renderSourceChecklist();
+  }
+
+  // ---- Pagina de Ajutor ----
+  function navigateToHelp() {
+    history.pushState({ view: 'help' }, '');
+    hasForwardEntry = false;
+    renderHelpView();
+  }
+
+  function renderHelpView() {
+    currentView = 'help';
+    updateNavButtons();
+    window.scrollTo(0, 0);
+
+    mainEl.innerHTML = `
+      <div class="settings-page">
+        <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+        <h1 class="reading-title" style="margin-bottom:1rem;">Ajutor și informații</h1>
+
+        <div class="settings-group">
+          <p class="settings-label">Cum funcționează aplicația</p>
+          <div class="help-text">
+            <p><strong>Categorii și surse.</strong> Taburile de sus filtrează lista după subiect (Actualități, Sport, Vremea etc.); poți selecta mai multe deodată. Sub ele apare, dacă e cazul, un al doilea rând cu sursele individuale din categoriile alese, ca să îngustezi la una singură. Poți schimba ordinea taburilor ținând apăsat și trăgând.</p>
+            <p><strong>Vremea.</strong> Nu e o sursă anume — adună automat, din toate sursele, orice titlu care pare legat de vreme/meteo/prognoze.</p>
+            <p><strong>Căutare.</strong> Iconița 🔍 din header deschide o casetă care filtrează titlurile pe măsură ce tastezi.</p>
+            <p><strong>Favorite.</strong> Steluța de pe fiecare titlu (☆/★) salvează articolul într-o listă proprie, accesibilă din iconița ★ din header — rămâne acolo chiar dacă articolul dispare din lista curentă.</p>
+            <p><strong>Citite.</strong> Titlurile deja deschise apar estompate, ca să știi ce ai văzut deja.</p>
+            <p><strong>Offline.</strong> Linkul „⬇ Descarcă pentru offline" de sub titlul aplicației salvează textul articolelor din secțiunea curentă, ca să le poți citi fără internet (utilă mai ales la drum).</p>
+            <p><strong>Setări.</strong> Temă (deschis/întunecat/automat), 3 variante de font, nuanță de culoare a textului și alegerea surselor afișate.</p>
+            <p><strong>Mărimea textului.</strong> Slider-ul de lângă butoanele de navigare (sus și jos) mărește doar titlurile din listă și textul articolelor — restul aplicației rămâne la mărimea normală.</p>
+            <p><strong>Navigare.</strong> Butoanele ← Înapoi / Înainte → (sus și jos) funcționează ca butoanele unui browser; butonul fizic de „înapoi" al telefonului face același lucru.</p>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <p class="settings-label">Despre conținut</p>
+          <div class="help-text">
+            <p>Articolele sunt preluate din fluxurile publice RSS/Atom ale surselor selectate — titlu, dată, sursă și, dacă feedul o oferă, o imagine asociată. Drepturile asupra conținutului aparțin publicațiilor originale; deschiderea unui articol în aplicație afișează textul extras, dar linkul către sursa originală e mereu disponibil.</p>
+            <p>Ordinea și frecvența știrilor depind în întregime de fiecare sursă — aplicația nu întârzie și nu grăbește nimic, doar centralizează ce publică ele.</p>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <p class="settings-label">Confidențialitate</p>
+          <div class="help-text">
+            <p>Aplicația nu cere cont, nu afișează reclame, nu vinde date personale și nu folosește cookie-uri de publicitate. Preferințele tale (temă, font, surse alese, favorite) sunt salvate doar local, pe acest dispozitiv.</p>
+            <p>Găzduirea (GitHub Pages și Cloudflare) poate procesa date tehnice minime — adresă IP, informații despre browser — conform politicilor proprii ale acestor servicii, independent de aplicație.</p>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <p class="settings-label">Ce este și ce nu este acest site</p>
+          <div class="help-text">
+            <p>„Știri în neștire" e un agregator personal de știri, construit ca proiect de învățare. Nu produce jurnalism propriu și nu garantează corectitudinea materialelor publicate de sursele externe. Rolul lui e doar să centralizeze titluri și să faciliteze descoperirea lor — pentru context complet și verificare, consultă întotdeauna articolul-sursă.</p>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('backBtn').addEventListener('click', goBackInApp);
   }
 
   // ---- Pagina de Favorite ----
@@ -1120,6 +1192,7 @@
 
   const CATEGORY_LABELS = {
     Actualitati: 'Actualități',
+    Vremea: 'Vremea',
     Sport: 'Sport',
     Financiar: 'Financiar',
     IT: 'IT/Tech',
@@ -1127,7 +1200,29 @@
     Cultura: 'Cultură',
     International: 'Internațional'
   };
-  const CATEGORY_ORDER = ['Actualitati', 'Sport', 'Financiar', 'IT', 'Religie', 'Cultura', 'International'];
+  const CATEGORY_ORDER = ['Actualitati', 'Vremea', 'Sport', 'Financiar', 'IT', 'Religie', 'Cultura', 'International'];
+
+  // 'Vremea' nu e o categorie legata de o sursa anume - e un filtru dupa cuvinte
+  // cheie in titlu, aplicat peste TOATE sursele active. Asa gasim stiri despre
+  // vreme/meteo/prognoze indiferent care sursa le-a publicat, fara sa fie nevoie
+  // sa cautam si sa intretinem surse dedicate doar pentru asta.
+  const WEATHER_KEYWORDS = [
+    'vreme', 'vremea', 'meteo', 'meteorolog', 'prognoza', 'prognoză',
+    'temperatur', 'canicul', 'caniculă', 'ger', 'îngheț', 'inghet',
+    'ninsoare', 'ninsori', 'zăpadă', 'zapada', 'viscol', 'polei',
+    'furtun', 'vijelie', 'grindin', 'tunete', 'descarcari electrice', 'descărcări electrice',
+    'cod galben', 'cod portocaliu', 'cod roșu', 'cod rosu', 'alerta meteo', 'alertă meteo',
+    'anm', 'val de caldura', 'val de căldură', 'seceta', 'secetă', 'inundaț', 'inundat',
+    'meteorologic'
+  ];
+  function isWeatherItem(item) {
+    const t = item.title.toLowerCase();
+    return WEATHER_KEYWORDS.some(k => t.includes(k));
+  }
+  function hasWeatherItems() {
+    const names = new Set(effectiveSources());
+    return allItems.some(i => names.has(i.source) && isWeatherItem(i));
+  }
 
   const tabsEl = document.getElementById('tabs');
   const subTabsEl = document.getElementById('subTabs');
@@ -1198,6 +1293,7 @@
   // 'IT' e singura categorie care accepta si surse internationale (ex. XDA
   // Developers), pentru ca subiectul conteaza mai mult decat tara aici.
   function sourcesInCategory(category) {
+    if (category === 'Vremea') return []; // nu e legata de surse, e un filtru pe continut
     const active = new Set(effectiveSources());
     return sourceMeta.filter(s => {
       if (!active.has(s.name)) return false;
@@ -1215,15 +1311,33 @@
     return Array.from(seen.values());
   }
   function poolItems() {
-    let names = effectiveSources();
-    if (activeCategories.size > 0) {
-      const namesInActiveCats = sourcesInActiveCategories().map(s => s.name);
-      names = names.filter(n => namesInActiveCats.includes(n));
-    }
-    if (activeSources.size > 0) {
-      names = names.filter(n => activeSources.has(n));
-    }
+    const names = effectiveSources();
     let items = allItems.filter(i => names.includes(i.source));
+
+    if (activeCategories.size > 0) {
+      const structuralCats = Array.from(activeCategories).filter(c => c !== 'Vremea');
+      const wantsWeather = activeCategories.has('Vremea');
+
+      let combined = [];
+      if (structuralCats.length > 0) {
+        const namesInCats = new Set();
+        structuralCats.forEach(cat => sourcesInCategory(cat).forEach(s => namesInCats.add(s.name)));
+        combined = combined.concat(items.filter(i => namesInCats.has(i.source)));
+      }
+      if (wantsWeather) {
+        combined = combined.concat(items.filter(isWeatherItem));
+      }
+      const seenLinks = new Set();
+      items = combined.filter(i => {
+        if (seenLinks.has(i.link)) return false;
+        seenLinks.add(i.link);
+        return true;
+      });
+    }
+
+    if (activeSources.size > 0) {
+      items = items.filter(i => activeSources.has(i.source));
+    }
     if (searchQuery) {
       items = items.filter(i => i.title.toLowerCase().includes(searchQuery));
     }
@@ -1341,9 +1455,10 @@
   function renderTabs() {
     // O categorie apare in bara de taburi doar daca are cel putin o sursa activa
     // (sourcesInCategory stie deja regulile speciale: International exclude IT,
-    // iar IT accepta si surse non-RO).
+    // iar IT accepta si surse non-RO). 'Vremea' e speciala: apare doar daca exista
+    // efectiv cel putin o stire ce se potriveste cu vreo cuvant cheie de vreme.
     const categories = applyCustomOrder(
-      CATEGORY_ORDER.filter(c => sourcesInCategory(c).length > 0),
+      CATEGORY_ORDER.filter(c => c === 'Vremea' ? hasWeatherItems() : sourcesInCategory(c).length > 0),
       settings.categoryOrder,
       c => c
     );
@@ -1595,6 +1710,11 @@
     if (state && state.view === 'favorites') {
       hasForwardEntry = false;
       renderFavoritesView();
+      return;
+    }
+    if (state && state.view === 'help') {
+      hasForwardEntry = false;
+      renderHelpView();
       return;
     }
     const wasSubPage = currentView !== 'list';
