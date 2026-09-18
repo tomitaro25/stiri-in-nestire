@@ -623,7 +623,9 @@
     shade: 'default',
     selectedSources: null, // null = toate sursele descoperite
     categoryOrder: null, // null = ordinea implicita (CATEGORY_ORDER); altfel, ordine aleasa de utilizator prin drag&drop
-    sourceOrder: null // null = ordinea implicita (descoperire); altfel, ordine aleasa de utilizator prin drag&drop
+    sourceOrder: null, // null = ordinea implicita (descoperire); altfel, ordine aleasa de utilizator prin drag&drop
+    activeCategories: null, // null = implicit ['Actualitati']; altfel, ultima selectie facuta de utilizator
+    activeSources: null // null = toate sursele din categoriile active; altfel, ultima ingustare facuta
   };
 
   function loadSettings() {
@@ -891,6 +893,7 @@
   function resetToAllView() {
     activeCategories = new Set();
     activeSources = new Set();
+    saveActiveFilters();
     renderTabs();
     renderSourceChips();
     if (currentView !== 'settings') renderList(); // nu iesim din pagina de Setari doar pt ca ai bifat o sursa
@@ -970,8 +973,14 @@
   // ---- Stare ----
   let allItems = [];
   let sourceMeta = []; // [{name, country, category}, ...] - vine de la Worker
-  let activeCategories = new Set(['Actualitati']); // implicit: doar sectiunea Actualitati (Stiri)
-  let activeSources = new Set(); // gol = toate sursele din categoriile active
+  let activeCategories = new Set(settings.activeCategories || ['Actualitati']); // ultima selectie a utilizatorului, sau implicit Actualitati
+  let activeSources = new Set(settings.activeSources || []); // gol = toate sursele din categoriile active
+
+  function saveActiveFilters() {
+    settings.activeCategories = Array.from(activeCategories);
+    settings.activeSources = Array.from(activeSources);
+    saveSettings(settings);
+  }
   let currentView = 'list'; // 'list' | 'article' | 'settings' | 'favorites'
   let hasForwardEntry = false;
   let searchQuery = ''; // cautare dupa cuvinte din titlu
@@ -1349,6 +1358,7 @@
       btn.addEventListener('click', () => {
         if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
         activeSources = new Set(); // schimbarea categoriilor reseteaza ingustarea pe surse individuale
+        saveActiveFilters();
         renderTabs();
         renderSourceChips();
         renderList();
@@ -1384,6 +1394,7 @@
       btn.setAttribute('aria-pressed', String(activeSources.has(s.name)));
       btn.addEventListener('click', () => {
         if (activeSources.has(s.name)) activeSources.delete(s.name); else activeSources.add(s.name);
+        saveActiveFilters();
         renderSourceChips();
         renderList();
       });
