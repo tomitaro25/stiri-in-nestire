@@ -1,6 +1,6 @@
 {
   "name": "Știri în neștire",
-  "short_name": "Neștire",
+  "short_name": "neȘtire",
   "description": "Titluri din mai multe surse, text simplu, fără reclame.",
   "start_url": "./index.html",
   "scope": "./",

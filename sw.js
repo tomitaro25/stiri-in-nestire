@@ -1,6 +1,6 @@
 // Numele cache-ului include un numar de versiune - cand schimbam shell-ul aplicatiei
 // (index.html, manifest, iconite), crestem numarul, ca telefoanele sa stie sa ia varianta noua.
-const CACHE_NAME = 'stiri-in-nestire-v39';
+const CACHE_NAME = 'stiri-in-nestire-v41';
 
 // "Shell-ul" aplicatiei: fisierele care fac aplicatia sa arate si sa functioneze,
 // spre deosebire de continutul (stirile), care vine mereu proaspat de la Worker.
