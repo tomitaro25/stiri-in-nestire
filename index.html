@@ -520,6 +520,16 @@
   }
   .share-btn:hover { background: var(--paper-raised); }
   .list-sentinel { height: 1px; }
+  .reading-failure {
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    margin: 0.5rem 0 1rem;
+    background: var(--paper-raised);
+  }
+  .reading-failure strong { display: block; margin-bottom: 0.4rem; }
+  .reading-failure p { margin: 0 0 0.8rem; color: var(--ink-soft); line-height: 1.5; }
+  .reading-note { font-size: 0.82rem; color: var(--ink-soft); font-style: italic; margin: 0.5rem 0 1rem; }
   button.icon-btn.spinning { animation: nestire-spin 0.9s linear infinite; }
   @keyframes nestire-spin { to { transform: rotate(360deg); } }
   .source-down { font-size: 0.68rem; color: var(--brick); }
@@ -925,6 +935,7 @@
             <p><strong>Reîmprospătare.</strong> Butonul ↻ din header aduce ultimele știri. Aplicația se reîmprospătează și singură când revii în ea după mai mult de 5 minute.</p>
             <p><strong>Distribuie.</strong> În pagina unui articol, butonul „Distribuie" trimite linkul articolului original prin aplicațiile telefonului.</p>
             <p><strong>Articole citite.</strong> Din Setări poți alege să ascunzi articolele deja deschise, ca să vezi doar ce e nou.</p>
+            <p><strong>Articole în alte limbi.</strong> Pentru sursele în franceză, engleză sau germană, butoanele și mesajele din pagina articolului apar în limba sursei. Dacă textul nu poate fi afișat, pagina spune pe scurt de ce (site blocat, abonament etc.) și oferă linkul către articolul original.</p>
             <p><strong>Ore aproximative (≈).</strong> Unele surse nu publică ora reală a articolului online (de exemplu Ziarul Lumina folosește data ediției tipărite). Pentru acestea, ora marcată cu ≈ e momentul în care aplicația a găsit prima dată articolul.</p>
           </div>
         </div>
@@ -1477,10 +1488,11 @@
     return Math.min(parsed, Date.now());
   }
 
-  function formatFullDate(dateStr) {
+  const DATE_LOCALES = { ro: 'ro-RO', fr: 'fr-FR', en: 'en-GB', de: 'de-DE' };
+  function formatFullDate(dateStr, lang = 'ro') {
     const date = new Date(dateStr);
     if (isNaN(date)) return '';
-    return date.toLocaleString('ro-RO', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleString(DATE_LOCALES[lang] || 'ro-RO', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
   }
 
   // Escapeaza si ghilimelele (varianta veche nu o facea), ca textul sa fie sigur
@@ -1964,19 +1976,89 @@
     renderArticleView(item);
   }
 
-  function readingHeaderHtml(item) {
+  // ---- Pagina articolului, in limba sursei ----
+  // Cine deschide un articol din Le Figaro citeste oricum in franceza: butoanele si
+  // mesajele din pagina articolului apar in aceeasi limba (limba vine de la Worker,
+  // declarata per sursa). Restul aplicatiei ramane in romana.
+  const READING_STRINGS = {
+    ro: {
+      back: 'Înapoi la titluri', share: 'Distribuie', shareLabel: 'Distribuie articolul', copied: 'Link copiat ✓', fav: 'Favorit',
+      loading: 'Se încarcă articolul…', original: 'Citește articolul pe site-ul original',
+      offlineSaved: 'Text disponibil offline (salvat anterior).', approx: 'aprox.',
+      incomplete: 'Textul pare scurt. Dacă articolul continuă, restul poate fi disponibil doar abonaților, pe site-ul original.',
+      failTitle: 'Textul articolului nu poate fi afișat aici',
+      reasons: {
+        blocked: 'Site-ul publicației blochează citirea automată a articolelor.',
+        empty: 'Textul nu a putut fi extras: articolul poate fi rezervat abonaților sau pagina are o structură neobișnuită.',
+        timeout: 'Site-ul publicației nu a răspuns la timp. Încearcă din nou peste puțin timp.',
+        offline: 'Nu există conexiune la internet, iar articolul nu a fost salvat pentru offline.',
+        error: 'A apărut o eroare la încărcarea articolului.'
+      }
+    },
+    fr: {
+      back: 'Retour aux titres', share: 'Partager', shareLabel: 'Partager l’article', copied: 'Lien copié ✓', fav: 'Favori',
+      loading: 'Chargement de l’article…', original: 'Lire l’article sur le site d’origine',
+      offlineSaved: 'Texte disponible hors ligne (enregistré précédemment).', approx: 'env.',
+      incomplete: 'Le texte semble court. Si l’article continue, la suite est peut-être réservée aux abonnés sur le site d’origine.',
+      failTitle: 'Le texte de l’article ne peut pas être affiché ici',
+      reasons: {
+        blocked: 'Le site de ce média bloque la lecture automatique de ses articles.',
+        empty: 'Le texte n’a pas pu être extrait : l’article est peut-être réservé aux abonnés ou la page a une structure inhabituelle.',
+        timeout: 'Le site du média n’a pas répondu à temps. Réessayez dans un instant.',
+        offline: 'Pas de connexion internet, et l’article n’a pas été enregistré hors ligne.',
+        error: 'Une erreur est survenue lors du chargement de l’article.'
+      }
+    },
+    en: {
+      back: 'Back to headlines', share: 'Share', shareLabel: 'Share the article', copied: 'Link copied ✓', fav: 'Favourite',
+      loading: 'Loading article…', original: 'Read the article on the original site',
+      offlineSaved: 'Text available offline (saved earlier).', approx: 'approx.',
+      incomplete: 'The text looks short. If the article continues, the rest may be for subscribers only on the original site.',
+      failTitle: 'The article text can’t be shown here',
+      reasons: {
+        blocked: 'This publication’s website blocks automated reading of its articles.',
+        empty: 'The text couldn’t be extracted: the article may be for subscribers only, or the page has an unusual layout.',
+        timeout: 'The publication’s website didn’t respond in time. Try again shortly.',
+        offline: 'No internet connection, and the article wasn’t saved for offline reading.',
+        error: 'Something went wrong while loading the article.'
+      }
+    },
+    de: {
+      back: 'Zurück zu den Schlagzeilen', share: 'Teilen', shareLabel: 'Artikel teilen', copied: 'Link kopiert ✓', fav: 'Favorit',
+      loading: 'Artikel wird geladen…', original: 'Artikel auf der Originalseite lesen',
+      offlineSaved: 'Text offline verfügbar (zuvor gespeichert).', approx: 'ca.',
+      incomplete: 'Der Text wirkt kurz. Falls der Artikel weitergeht, ist der Rest auf der Originalseite womöglich nur für Abonnenten.',
+      failTitle: 'Der Artikeltext kann hier nicht angezeigt werden',
+      reasons: {
+        blocked: 'Die Website dieses Mediums blockiert das automatische Lesen ihrer Artikel.',
+        empty: 'Der Text konnte nicht ausgelesen werden: Der Artikel ist womöglich nur für Abonnenten, oder die Seite ist ungewöhnlich aufgebaut.',
+        timeout: 'Die Website des Mediums hat nicht rechtzeitig geantwortet. Bitte gleich noch einmal versuchen.',
+        offline: 'Keine Internetverbindung, und der Artikel wurde nicht offline gespeichert.',
+        error: 'Beim Laden des Artikels ist ein Fehler aufgetreten.'
+      }
+    }
+  };
+  const INCOMPLETE_TEXT_CHARS = 600;
+
+  function langOf(item) {
+    const meta = sourceMeta.find(s => s.name === item.source);
+    const lang = (meta && meta.lang) || 'ro';
+    return READING_STRINGS[lang] ? lang : 'ro';
+  }
+
+  function readingHeaderHtml(item, t) {
     return `
       <div class="reading-header">
-        <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+        <button class="back-btn" id="backBtn">${escapeHtml(t.back)}</button>
         <div class="reading-actions">
-          <button class="share-btn" id="shareBtn" aria-label="Distribuie articolul">Distribuie</button>
-          <button class="fav-star-reading${isFavorite(item.link) ? ' active' : ''}" id="favStarReading" aria-label="Favorit">${isFavorite(item.link) ? '★' : '☆'}</button>
+          <button class="share-btn" id="shareBtn" aria-label="${escapeHtml(t.shareLabel)}">${escapeHtml(t.share)}</button>
+          <button class="fav-star-reading${isFavorite(item.link) ? ' active' : ''}" id="favStarReading" aria-label="${escapeHtml(t.fav)}">${isFavorite(item.link) ? '★' : '☆'}</button>
         </div>
       </div>`;
   }
 
   // Distribuire prin meniul nativ al telefonului; pe calculator, copiere in clipboard.
-  async function shareLink(title, url, button) {
+  async function shareLink(title, url, button, copiedText = 'Link copiat ✓') {
     if (navigator.share) {
       try { await navigator.share({ title, url }); } catch {}
       return;
@@ -1985,7 +2067,7 @@
       await navigator.clipboard.writeText(url);
       if (button) {
         const original = button.textContent;
-        button.textContent = 'Link copiat ✓';
+        button.textContent = copiedText;
         setTimeout(() => { button.textContent = original; }, 2000);
       }
     } catch {
@@ -1993,11 +2075,11 @@
     }
   }
 
-  function wireReadingHeader(item) {
+  function wireReadingHeader(item, t) {
     document.getElementById('backBtn').addEventListener('click', goBackInApp);
     const shareBtn = document.getElementById('shareBtn');
     if (isHttpLink(item.link)) {
-      shareBtn.addEventListener('click', () => shareLink(item.title, item.link, shareBtn));
+      shareBtn.addEventListener('click', () => shareLink(item.title, item.link, shareBtn, t.copied));
     } else {
       shareBtn.remove();
     }
@@ -2015,55 +2097,65 @@
     window.scrollTo(0, 0);
     markAsRead(item.link);
 
-    mainEl.innerHTML = `
-      <div class="reading">
-        ${readingHeaderHtml(item)}
-        <div class="state">Se încarcă articolul…</div>
-      </div>`;
-    wireReadingHeader(item);
+    const lang = langOf(item);
+    const t = READING_STRINGS[lang];
+    const metaHtml = `<p class="reading-meta"><span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>${isFutureDate(item.date) ? '' : ` · ${item.dateEstimated ? t.approx + ' ' : ''}${escapeHtml(formatFullDate(item.date, lang))}`}</p>`;
+    const titleHtml = `<h1 class="reading-title">${escapeHtml(item.title)}</h1>`;
+    const originalLink = `<a class="reading-source-link" href="${safeHref(item.link)}" target="_blank" rel="noopener">${escapeHtml(t.original)}</a>`;
 
-    function renderBody(text, offlineNotice) {
-      const paragraphs = (text || '')
-        .split('\n\n')
-        .filter(p => p.trim())
-        .map(p => `<p>${escapeHtml(p)}</p>`)
-        .join('');
-      mainEl.innerHTML = `
-        <div class="reading">
-          ${readingHeaderHtml(item)}
-          <p class="reading-meta"><span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>${isFutureDate(item.date) ? '' : ` · ${item.dateEstimated ? 'aprox. ' : ''}${formatFullDate(item.date)}`}</p>
-          <h1 class="reading-title">${escapeHtml(item.title)}</h1>
-          ${offlineNotice ? `<p class="offline-status visible" style="margin-bottom:1rem;">${offlineNotice}</p>` : ''}
-          <div class="reading-body">${paragraphs || '<p>Nu am putut extrage textul acestui articol.</p>'}</div>
-          <a class="reading-source-link" href="${safeHref(item.link)}" target="_blank" rel="noopener">Vezi articolul original</a>
-        </div>`;
-      wireReadingHeader(item);
+    function show(inner) {
+      mainEl.innerHTML = `<div class="reading" lang="${lang}">${readingHeaderHtml(item, t)}${inner}</div>`;
+      wireReadingHeader(item, t);
     }
 
+    show(`<div class="state">${escapeHtml(t.loading)}</div>`);
+
+    function renderBody(text, notice) {
+      const paragraphs = text.split('\n\n').filter(p => p.trim()).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+      const shortNote = text.length < INCOMPLETE_TEXT_CHARS
+        ? `<p class="reading-note">${escapeHtml(t.incomplete)}</p>` : '';
+      show(`${metaHtml}${titleHtml}
+        ${notice ? `<p class="offline-status visible" style="margin-bottom:1rem;">${escapeHtml(notice)}</p>` : ''}
+        <div class="reading-body">${paragraphs}</div>
+        ${shortNote}
+        ${originalLink}`);
+    }
+
+    function renderFailure(reason) {
+      show(`${metaHtml}${titleHtml}
+        <div class="reading-failure">
+          <strong>${escapeHtml(t.failTitle)}</strong>
+          <p>${escapeHtml(t.reasons[reason] || t.reasons.error)}</p>
+          ${originalLink}
+        </div>`);
+    }
+
+    // Motivul vine de la Worker ('blocked', 'empty', 'timeout', 'error'); fara
+    // raspuns, diferentiem intre lipsa conexiunii si o eroare de server.
+    let data = null;
+    let reason = null;
     try {
       const res = await fetch(`${WORKER_URL}?article=${encodeURIComponent(item.link)}`);
-      if (!res.ok) throw new Error('Răspuns invalid de la server');
-      const data = await res.json();
-      renderBody(data.text);
-      offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text || '', cachedAt: Date.now() });
-    } catch (err) {
-      // Fara conexiune (sau eroare de retea) - incercam varianta salvata offline, daca exista
-      const cached = await offlineGet(item.link);
-      if (cached && cached.text) {
-        renderBody(cached.text, 'Text disponibil offline (salvat anterior).');
-        return;
-      }
-      mainEl.innerHTML = `
-        <div class="reading">
-          ${readingHeaderHtml(item)}
-          <div class="state">
-            <strong>Nu am putut încărca articolul</strong>
-            A apărut o problemă la extragerea textului (posibil fără conexiune, iar articolul nu era salvat offline). Poți încerca din nou sau deschide articolul original.
-            <br><a class="reading-source-link" href="${safeHref(item.link)}" target="_blank" rel="noopener">Vezi articolul original</a>
-          </div>
-        </div>`;
-      wireReadingHeader(item);
+      if (res.ok) data = await res.json();
+      else reason = 'error';
+    } catch {
+      reason = navigator.onLine === false ? 'offline' : 'error';
     }
+
+    if (data && data.text) {
+      renderBody(data.text);
+      offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text, cachedAt: Date.now() });
+      return;
+    }
+    if (data) reason = data.reason && data.reason !== 'ok' ? data.reason : 'empty';
+
+    // Varianta salvata offline, daca exista, e mai buna decat un mesaj de eroare.
+    const cached = await offlineGet(item.link);
+    if (cached && cached.text) {
+      renderBody(cached.text, t.offlineSaved);
+      return;
+    }
+    renderFailure(reason);
   }
 
   // ---- Navigare inapoi/inainte (buton fizic al telefonului + butoanele proprii) ----
