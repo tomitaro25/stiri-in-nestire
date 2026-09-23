@@ -1374,28 +1374,43 @@
   // folosit metaforic despre scandaluri), cerem fie un semnal PUTERNIC de unul
   // singur (ANM, cod rosu/portocaliu/galben, "fenomene meteo", viscol, canicula),
   // fie cel putin DOUA semnale slabe impreuna (ploi, temperaturi, frig, etc.).
-  const WEATHER_STRONG = [
-    'anm', 'cod roșu', 'cod rosu', 'cod portocaliu', 'cod galben',
-    'prognoza meteo', 'prognoză meteo', 'fenomene meteo', 'alerta meteo', 'alertă meteo',
+  // Potrivirea ignora diacriticele: multe site-uri scriu inca "ş/ţ" cu sedila, altele
+  // "ș/ț" cu virgula, altele deloc - toate devin aici aceleasi litere simple.
+  function normalizeForMatch(str) {
+    return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  function normalizedKeywords(list) {
+    return [...new Set(list.map(normalizeForMatch))];
+  }
+  const WEATHER_STRONG = normalizedKeywords([
+    'anm', 'cod rosu', 'cod portocaliu', 'cod galben',
+    'prognoza meteo', 'fenomene meteo', 'alerta meteo', 'avertizare meteo',
     'viscol', 'canicul', 'ninsoare', 'ninsori', 'meteorolog',
-    'val de caldura', 'val de căldură'
-  ];
-  const WEATHER_WEAK = [
-    'ploi', 'ploaie', 'vreme', 'vremea', 'temperatur', 'grade',
-    'racoare', 'răcoare', 'frig', 'caldura', 'căldură', 'meteo',
-    'seceta', 'secetă', 'inundaț', 'inundat', 'grindin', 'polei',
-    'zăpadă', 'zapada', 'îngheț', 'inghet', 'prognoza', 'prognoză'
-  ];
+    'val de caldura', 'val de frig'
+  ]);
+  // Fiecare cuvant slab e distinct ("vremea" nu mai numara dublu, fiind inclus in "vreme").
+  const WEATHER_WEAK = normalizedKeywords([
+    'ploi', 'ploaie', 'vreme', 'temperatur', 'grade',
+    'racoare', 'frig', 'caldura', 'meteo',
+    'seceta', 'inundat', 'grindin', 'polei',
+    'zapada', 'inghet', 'prognoz', 'furtun', 'vijelie'
+  ]);
+  // Cuvintele foarte scurte (ex. "anm") se cauta doar ca vorba intreaga.
+  function containsKeyword(text, keyword) {
+    if (keyword.length <= 3) return new RegExp(`\\b${keyword}\\b`).test(text);
+    return text.includes(keyword);
+  }
+  // Doar sursele romanesti de actualitate: vremea n-are ce cauta la Sport sau IT,
+  // iar in titlurile straine abrevieri ca "ANM" ar da potriviri false.
   function isGeneralNewsSource(sourceName) {
     const meta = sourceMeta.find(s => s.name === sourceName);
-    return Boolean(meta && meta.category === 'Actualitati');
+    return Boolean(meta && meta.category === 'Actualitati' && meta.country === 'RO');
   }
   function isWeatherItem(item) {
     if (!isGeneralNewsSource(item.source)) return false;
-    const t = item.title.toLowerCase();
-    if (WEATHER_STRONG.some(k => t.includes(k))) return true;
-    const weakHits = WEATHER_WEAK.filter(k => t.includes(k)).length;
-    return weakHits >= 2;
+    const t = normalizeForMatch(item.title);
+    if (WEATHER_STRONG.some(k => containsKeyword(t, k))) return true;
+    return WEATHER_WEAK.filter(k => containsKeyword(t, k)).length >= 2;
   }
   function hasWeatherItems() {
     const names = new Set(effectiveSources());
@@ -1743,7 +1758,7 @@
     // iar IT accepta si surse non-RO). 'Vremea' e speciala: apare doar daca exista
     // efectiv cel putin o stire ce se potriveste cu vreo cuvant cheie de vreme.
     const categories = applyCustomOrder(
-      CATEGORY_ORDER.filter(c => c === 'Vremea' ? hasWeatherItems() : sourcesInCategory(c).length > 0),
+      CATEGORY_ORDER.filter(c => c === 'Vremea' ? sourcesInCategory('Actualitati').length > 0 : sourcesInCategory(c).length > 0),
       settings.categoryOrder,
       c => c
     );
@@ -1887,9 +1902,12 @@
     if (filtered.length === 0) {
       const state = document.createElement('div');
       state.className = 'state';
-      state.textContent = settings.hideRead
-        ? 'Nicio știre necitită de afișat momentan.'
-        : 'Nicio știre de afișat momentan.';
+      const onlyWeather = activeCategories.size === 1 && activeCategories.has('Vremea');
+      state.textContent = onlyWeather
+        ? 'Nicio știre despre vreme în acest moment. Secțiunea se completează singură când sursele publică prognoze sau avertizări meteo.'
+        : settings.hideRead
+          ? 'Nicio știre necitită de afișat momentan.'
+          : 'Nicio știre de afișat momentan.';
       mainEl.appendChild(state);
       updateNavButtons();
       if (!options.keepScroll) window.scrollTo(0, 0);
