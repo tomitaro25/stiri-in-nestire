@@ -629,6 +629,17 @@
     overflow-wrap: anywhere;
   }
 
+  /* Textul articolului justificat (ca in presa tiparita), cu despartire automata in
+     silabe ca sa nu apara spatii mari intre cuvinte pe ecrane inguste. Browserul
+     desparte dupa limba articolului (atributul lang de pe .reading). Titlurile raman
+     aliniate la stanga: rândurile lor scurte ar arata rau intinse intre margini. */
+  html[data-text-align="justify"] .reading-body p {
+    text-align: justify;
+    text-justify: inter-word;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 7 3 3; /* desparte doar cuvinte de minimum 7 litere, cu minimum 3 litere pe fiecare parte */
+  }
   .reading-body p {
     font-family: var(--font-title);
     font-size: calc(1.125rem * var(--content-scale));
@@ -805,7 +816,8 @@
     sourceOrder: null, // null = ordinea implicita (descoperire); altfel, ordine aleasa de utilizator prin drag&drop
     activeCategories: null, // null = implicit ['Actualitati']; altfel, ultima selectie facuta de utilizator
     activeSources: null, // null = toate sursele din categoriile active; altfel, ultima ingustare facuta
-    hideRead: false // true = articolele deja deschise nu mai apar in lista
+    hideRead: false, // true = articolele deja deschise nu mai apar in lista
+    textAlign: 'justify' // 'justify' | 'left' - alinierea textului din articole
   };
 
   function loadSettings() {
@@ -836,6 +848,7 @@
     const theme = resolvedTheme();
     document.documentElement.dataset.theme = theme;
     document.documentElement.dataset.fontSize = settings.fontSize;
+    document.documentElement.dataset.textAlign = settings.textAlign === 'left' ? 'left' : 'justify';
 
     const shade = SHADE_PRESETS.find(s => s.id === settings.shade) || SHADE_PRESETS[0];
     document.documentElement.style.setProperty('--ink', theme === 'dark' ? shade.dark : shade.light);
@@ -921,6 +934,14 @@
                 <button data-value="hide">Ascunde</button>
               </div>
             </div>
+
+            <div class="settings-group">
+              <p class="settings-label">Aliniere text articol</p>
+              <div class="segmented" id="textAlignGroup">
+                <button data-value="justify">Justificat</button>
+                <button data-value="left">Stânga</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -953,6 +974,9 @@
 
     wireSegmented(document.getElementById('hideReadGroup'), settings.hideRead ? 'hide' : 'show', value => {
       settings.hideRead = value === 'hide'; saveSettings(settings);
+    });
+    wireSegmented(document.getElementById('textAlignGroup'), settings.textAlign === 'left' ? 'left' : 'justify', value => {
+      settings.textAlign = value; saveSettings(settings); applyVisualSettings();
     });
 
     updateOfflineInfo();
@@ -1024,6 +1048,7 @@
             <p><strong>Navigare.</strong> Butoanele ← Înapoi / Înainte → (sus și jos) funcționează ca butoanele unui browser; butonul fizic de „înapoi" al telefonului face același lucru.</p>
             <p><strong>Reîmprospătare.</strong> Butonul ↻ din header aduce ultimele știri. Aplicația se reîmprospătează și singură când revii în ea după mai mult de 5 minute.</p>
             <p><strong>Distribuie.</strong> În pagina unui articol, butonul „Distribuie" trimite linkul articolului original prin aplicațiile telefonului.</p>
+            <p><strong>Aliniere.</strong> Textul articolelor e justificat (distribuit egal între margini), cu despărțire automată în silabe. Titlurile rămân aliniate la stânga. Din Setări poți alege și alinierea la stânga pentru text.</p>
             <p><strong>Articole citite.</strong> Din Setări poți alege să ascunzi articolele deja deschise, ca să vezi doar ce e nou.</p>
             <p><strong>Articole în alte limbi.</strong> Pentru sursele în franceză, engleză sau germană, butoanele și mesajele din pagina articolului apar în limba sursei. Dacă textul nu poate fi afișat, pagina spune pe scurt de ce (site blocat, abonament etc.) și oferă linkul către articolul original.</p>
             <p><strong>Ore aproximative (≈).</strong> Unele surse nu publică ora reală a articolului online (de exemplu Ziarul Lumina folosește data ediției tipărite). Pentru acestea, ora marcată cu ≈ e momentul în care aplicația a găsit prima dată articolul.</p>
