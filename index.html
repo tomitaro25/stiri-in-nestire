@@ -257,23 +257,56 @@
   }
   .settings-col { flex: 1; min-width: 0; }
 
-  .source-checklist {
-    column-count: 2;
-    column-gap: 1.1rem;
+  /* ---- Setari: liste de ordonare (categorii, surse) ---- */
+  .settings-hint { font-size: 0.78rem; color: var(--ink-soft); margin: 0 0 0.5rem; line-height: 1.45; }
+  .order-group-label {
+    font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase;
+    color: var(--ink-soft); margin: 0.9rem 0 0.3rem;
   }
-  .source-cat-group {
-    break-inside: avoid;
-    -webkit-column-break-inside: avoid;
-    margin-bottom: 0.7rem;
-  }
-  .source-check {
+  .order-list { list-style: none; margin: 0; padding: 0; position: relative; }
+  .order-row {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-    margin-bottom: 0.35rem;
+    gap: 0.45rem;
+    padding: 0.28rem 0.25rem;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    font-size: 0.88rem;
   }
-  .source-check input { accent-color: var(--teal); width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+  .order-row.dragging {
+    position: relative;
+    z-index: 5;
+    background: var(--paper-raised);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+  }
+  .drag-handle {
+    touch-action: none;           /* doar manerul preia gestul; restul randului lasa derularea normala */
+    cursor: grab;
+    color: var(--ink-soft);
+    padding: 0.35rem 0.3rem;
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .order-row.dragging .drag-handle { cursor: grabbing; }
+  .order-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.45rem; }
+  .order-main input { accent-color: var(--teal); width: 1.05rem; height: 1.05rem; flex-shrink: 0; }
+  .order-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .order-tag { font-size: 0.66rem; color: var(--ink-soft); border: 1px solid var(--rule); border-radius: 4px; padding: 0.05rem 0.3rem; flex-shrink: 0; }
+  .order-arrows { display: flex; gap: 0.15rem; flex-shrink: 0; }
+  .order-arrows button {
+    all: unset; cursor: pointer; color: var(--teal); font-size: 0.85rem;
+    width: 1.7rem; height: 1.7rem; display: grid; place-items: center; border-radius: 6px;
+  }
+  .order-arrows button:hover { background: var(--paper-raised); }
+  .order-arrows button:disabled { opacity: 0.25; cursor: default; }
+  .order-drop-line {
+    position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px;
+    background: var(--nav-highlight); pointer-events: none; display: none;
+  }
 
   .select-all-btn {
     all: unset;
@@ -284,17 +317,22 @@
     display: inline-block;
   }
 
-  /* Source tabs */
+  /* ---- Categorii (sus) si selectorul de surse, fixate la derulare ---- */
+  /* Fundal usor translucid, cu estompare: continutul care trece pe dedesubt ramane
+     vag vizibil, efect modern discret (cu fundal solid ca rezerva pe browsere vechi). */
   nav.tabs {
     position: sticky;
     top: var(--navbar-top-h, 44px);
     z-index: 30;
     background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    backdrop-filter: saturate(1.4) blur(10px);
     display: flex;
-    gap: 0.25rem;
-    padding: 0.75rem 1rem;
+    flex-wrap: wrap;           /* categoriile trec pe al doilea rand, fara derulare laterala */
+    gap: 0.35rem;
+    padding: 0.6rem 1rem;
     border-bottom: 1px solid var(--rule);
-    overflow-x: auto;
   }
 
   nav.tabs-sub {
@@ -302,13 +340,14 @@
     top: calc(var(--navbar-top-h, 44px) + var(--tabs-h, 45px));
     z-index: 29;
     display: none;
-    gap: 0.25rem;
-    padding: 0.5rem 1rem;
+    padding: 0.35rem 1rem;
     border-bottom: 1px solid var(--rule);
-    overflow-x: auto;
     background: var(--paper-raised);
+    background: color-mix(in srgb, var(--paper-raised) 92%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(10px);
+    backdrop-filter: saturate(1.4) blur(10px);
   }
-  nav.tabs-sub.visible { display: flex; }
+  nav.tabs-sub.visible { display: block; }
 
   .tab {
     appearance: none;
@@ -316,47 +355,90 @@
     background: transparent;
     color: var(--ink-soft);
     font-family: inherit;
-    font-size: 0.875rem;
-    padding: 0.44rem 0.9rem;
+    font-size: 0.84rem;
+    padding: 0.36rem 0.8rem;
     border-radius: 999px;
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
     -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    /* touch-action e setat din JS (touchAction='none'), ca sa preluam noi tot gestul */
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
   }
-  .tab.dragging {
-    cursor: grabbing;
-    opacity: 0.65;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
-    position: relative;
-    z-index: 20;
-  }
-
-  .tab-drop-indicator {
-    position: absolute;
-    top: 0.35rem;
-    bottom: 0.35rem;
-    width: 3px;
-    background: var(--nav-highlight);
-    border-radius: 2px;
-    pointer-events: none;
-    display: none;
-  }
-  .tab-drop-indicator.visible { display: block; }
-
-  .tab-sub {
-    font-size: 0.78rem;
-    padding: 0.32rem 0.7rem;
-  }
-
+  @media (hover: hover) { .tab:hover { border-color: var(--teal); color: var(--ink); } }
+  .tab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
   .tab[aria-pressed="true"] {
     background: var(--paper-raised);
+    background: color-mix(in srgb, var(--teal) 16%, transparent);
     color: var(--ink);
     border-color: var(--teal);
     font-weight: 600;
   }
+
+  /* Rezumatul surselor: un singur rand, se deschide la atingere */
+  .source-summary {
+    all: unset;
+    box-sizing: border-box;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.84rem;
+    color: var(--ink);
+    padding: 0.3rem 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .source-summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
+  .ss-label { color: var(--ink-soft); flex-shrink: 0; }
+  .ss-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .ss-chevron { color: var(--teal); transition: transform 0.2s; flex-shrink: 0; }
+  .source-summary[aria-expanded="true"] .ss-chevron { transform: rotate(180deg); }
+
+  .source-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    max-height: min(60vh, 440px);
+    overflow-y: auto;
+    background: var(--paper-raised);
+    border-bottom: 1px solid var(--rule);
+    border-radius: 0 0 14px 14px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
+    padding: 0.7rem 1rem 0.9rem;
+  }
+  .source-panel[hidden] { display: none; }
+  .source-panel:not([hidden]) { animation: nestire-panel-in 0.16s ease-out; }
+  @keyframes nestire-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .panel-group-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0.7rem 0 0.4rem;
+  }
+  .panel-group-label:first-child { margin-top: 0; }
+  .panel-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .panel-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem; gap: 0.5rem; }
+  .panel-link { all: unset; cursor: pointer; font-size: 0.8rem; color: var(--teal); }
+  .panel-done {
+    all: unset;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--paper);
+    background: var(--teal);
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+  }
+
+  /* Bare de derulare subtiri, in culorile aplicatiei (inainte: albe si groase pe desktop) */
+  * { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
 
   /* Bara de navigare (inapoi/inainte) - fixata, mereu vizibila, fara scroll */
   nav.nav-bar {
@@ -843,9 +925,16 @@
         </div>
 
         <div class="settings-group">
-          <p class="settings-label">Surse afișate</p>
-          <div class="source-checklist" id="sourceChecklist"></div>
-          <button class="select-all-btn" id="selectAllBtn">Selectează tot</button>
+          <p class="settings-label">Ordinea categoriilor</p>
+          <p class="settings-hint">Trage de ⠿ sau folosește săgețile. Ordinea se aplică imediat pe prima pagină.</p>
+          <ul class="order-list" id="categoryOrderList"></ul>
+        </div>
+
+        <div class="settings-group">
+          <p class="settings-label">Surse pe prima pagină</p>
+          <p class="settings-hint">Bifează sursele pe care vrei să le vezi și aranjează-le în ordinea preferată. Ordinea e folosită în selectorul „Surse" de pe prima pagină.</p>
+          <div id="sourceChecklist"></div>
+          <button class="select-all-btn" id="selectAllBtn">Selectează toate sursele</button>
         </div>
 
         <div class="settings-group">
@@ -899,6 +988,7 @@
       settings.shade = value; saveSettings(settings); applyVisualSettings();
     });
 
+    renderCategoryOrderList();
     renderSourceChecklist();
   }
 
@@ -923,7 +1013,7 @@
         <div class="settings-group">
           <p class="settings-label">Cum funcționează aplicația</p>
           <div class="help-text">
-            <p><strong>Categorii și surse.</strong> Taburile de sus filtrează lista după subiect (Actualități, Sport, Vremea etc.); poți selecta mai multe deodată. Sub ele apare, dacă e cazul, un al doilea rând cu sursele individuale din categoriile alese, ca să îngustezi la una singură. Poți schimba ordinea taburilor ținând apăsat și trăgând.</p>
+            <p><strong>Categorii și surse.</strong> Taburile de sus filtrează lista după subiect (Actualități, Sport, Vremea etc.); poți selecta mai multe deodată. Sub ele, rândul „Surse" se deschide la atingere și îți arată sursele categoriilor alese (la Internațional, grupate pe limbi), ca să îngustezi la una sau câteva. Din Setări alegi ce surse apar și în ce ordine, plus ordinea categoriilor.</p>
             <p><strong>Vremea.</strong> Nu e o sursă anume — adună automat, din toate sursele, orice titlu care pare legat de vreme/meteo/prognoze.</p>
             <p><strong>Căutare.</strong> Iconița 🔍 din header deschide o casetă care filtrează titlurile pe măsură ce tastezi.</p>
             <p><strong>Favorite.</strong> Steluța de pe fiecare titlu (☆/★) salvează articolul într-o listă proprie, accesibilă din iconița ★ din header — rămâne acolo chiar dacă articolul dispare din lista curentă.</p>
@@ -1088,89 +1178,208 @@
     });
   }
 
-  function resetToAllView() {
-    activeCategories = new Set();
-    activeSources = new Set();
-    saveActiveFilters();
+  // Reordonare verticala, prin maner (⠿). Doar manerul preia gestul (touch-action: none),
+  // deci derularea paginii ramane normala oriunde altundeva pe rand - fara conflictele
+  // dintre atingere, tragere si derulare avute pe butoanele orizontale.
+  function makeVerticalSortable(list, onChange) {
+    const line = document.createElement('div');
+    line.className = 'order-drop-line';
+    list.appendChild(line);
+
+    list.querySelectorAll('.drag-handle').forEach(handle => {
+      handle.addEventListener('contextmenu', e => e.preventDefault());
+      handle.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        const row = handle.closest('.order-row');
+        const pointerId = e.pointerId;
+        const startY = e.clientY;
+        const startScroll = window.scrollY;
+        let lastY = e.clientY;
+        let dropIndex = null;
+        let autoScroll = null;
+        row.classList.add('dragging');
+        try { handle.setPointerCapture(pointerId); } catch {}
+
+        const rows = () => [...list.querySelectorAll('.order-row')].filter(r => r !== row);
+        function update() {
+          row.style.transform = `translateY(${lastY - startY + window.scrollY - startScroll}px)`;
+          const others = rows();
+          dropIndex = others.length;
+          for (let i = 0; i < others.length; i++) {
+            const r = others[i].getBoundingClientRect();
+            if (lastY < r.top + r.height / 2) { dropIndex = i; break; }
+          }
+          const listTop = list.getBoundingClientRect().top;
+          let y;
+          if (others.length === 0) y = 0;
+          else if (dropIndex >= others.length) y = others[others.length - 1].getBoundingClientRect().bottom - listTop;
+          else y = others[dropIndex].getBoundingClientRect().top - listTop;
+          line.style.top = `${y - 1.5}px`;
+          line.style.display = 'block';
+        }
+        function tick() {
+          // derulare automata cand tragi aproape de marginea ecranului
+          const edge = 90;
+          let dy = 0;
+          if (lastY < edge) dy = -8; else if (lastY > window.innerHeight - edge) dy = 8;
+          if (dy) { window.scrollBy(0, dy); update(); }
+          autoScroll = requestAnimationFrame(tick);
+        }
+        function onMove(ev) {
+          if (ev.pointerId !== pointerId) return;
+          ev.preventDefault();
+          lastY = ev.clientY;
+          update();
+        }
+        function onUp(ev) {
+          if (ev.pointerId !== pointerId) return;
+          cancelAnimationFrame(autoScroll);
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointercancel', onUp);
+          try { handle.releasePointerCapture(pointerId); } catch {}
+          row.classList.remove('dragging');
+          row.style.transform = '';
+          line.style.display = 'none';
+          if (dropIndex !== null) {
+            const others = rows();
+            if (dropIndex >= others.length) list.insertBefore(row, line);
+            else list.insertBefore(row, others[dropIndex]);
+            refreshArrowStates(list);
+            onChange();
+          }
+        }
+        window.addEventListener('pointermove', onMove, { passive: false });
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+        update();
+        autoScroll = requestAnimationFrame(tick);
+      });
+    });
+
+    list.querySelectorAll('.order-arrows button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.order-row');
+        if (btn.dataset.dir === 'up' && row.previousElementSibling) {
+          list.insertBefore(row, row.previousElementSibling);
+        } else if (btn.dataset.dir === 'down' && row.nextElementSibling && row.nextElementSibling.classList.contains('order-row')) {
+          list.insertBefore(row.nextElementSibling, row);
+        } else {
+          return;
+        }
+        refreshArrowStates(list);
+        onChange();
+      });
+    });
+    refreshArrowStates(list);
+  }
+
+  function refreshArrowStates(list) {
+    const rowsInList = [...list.querySelectorAll('.order-row')];
+    rowsInList.forEach((r, i) => {
+      r.querySelector('[data-dir="up"]').disabled = i === 0;
+      r.querySelector('[data-dir="down"]').disabled = i === rowsInList.length - 1;
+    });
+  }
+
+  function orderRowHtml(id, innerHtml) {
+    return `<li class="order-row" data-id="${escapeHtml(id)}">
+      <span class="drag-handle" aria-hidden="true">⠿</span>
+      <div class="order-main">${innerHtml}</div>
+      <span class="order-arrows">
+        <button type="button" data-dir="up" aria-label="Mută mai sus">↑</button>
+        <button type="button" data-dir="down" aria-label="Mută mai jos">↓</button>
+      </span>
+    </li>`;
+  }
+
+  // Dupa orice schimbare in Setari, prima pagina se actualizeaza imediat
+  // (barele de categorii si surse raman vizibile si pe pagina de Setari).
+  function refreshFrontFilters() {
     renderTabs();
     renderSourceChips();
-    if (currentView !== 'settings') renderList(); // nu iesim din pagina de Setari doar pt ca ai bifat o sursa
+  }
+
+  function renderCategoryOrderList() {
+    const list = document.getElementById('categoryOrderList');
+    if (!list) return;
+    const categories = visibleCategories();
+    list.innerHTML = categories.map(c =>
+      orderRowHtml(c, `<span class="order-name">${escapeHtml(CATEGORY_LABELS[c] || c)}</span>`)
+    ).join('');
+    makeVerticalSortable(list, () => {
+      settings.categoryOrder = [...list.querySelectorAll('.order-row')].map(r => r.dataset.id);
+      saveSettings(settings);
+      refreshFrontFilters();
+      renderSourceChecklist(); // grupurile de surse urmeaza ordinea categoriilor
+    });
+  }
+
+  // Grupurile de surse din Setari, in ordinea categoriilor alese de utilizator.
+  // "Internațional" = orice sursa non-RO, in afara de IT/Tech (aceeasi regula ca pe prima pagina).
+  function settingsSourceGroups() {
+    const catOf = s => (s.country !== 'RO' && s.category !== 'IT') ? 'International' : (s.category || 'Actualitati');
+    const cats = applyCustomOrder(CATEGORY_ORDER.filter(c => c !== 'Vremea'), settings.categoryOrder, c => c);
+    return cats
+      .map(cat => ({ cat, sources: applyCustomOrder(sourceMeta.filter(s => catOf(s) === cat), settings.sourceOrder, s => s.name) }))
+      .filter(g => g.sources.length > 0);
   }
 
   function renderSourceChecklist() {
     const container = document.getElementById('sourceChecklist');
+    if (!container) return;
     container.innerHTML = '';
     const discovered = sourceMeta.map(s => s.name);
     const effectiveSelected = settings.selectedSources || discovered;
 
-    function addHeading(parent, text) {
-      const heading = document.createElement('p');
-      heading.textContent = text;
-      heading.style.cssText = 'font-size:0.72rem;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;margin:0 0 0.3rem;';
-      parent.appendChild(heading);
+    function persistSourceOrder() {
+      settings.sourceOrder = [...container.querySelectorAll('.order-row')].map(r => r.dataset.id);
+      saveSettings(settings);
+      renderSourceChips();
     }
 
-    function addSourceCheck(parent, s) {
-      const label = document.createElement('label');
-      label.className = 'source-check';
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = effectiveSelected.includes(s.name);
-      checkbox.addEventListener('change', () => {
-        const current = new Set(settings.selectedSources || discovered);
-        if (checkbox.checked) current.add(s.name); else current.delete(s.name);
-        settings.selectedSources = Array.from(current);
-        saveSettings(settings);
-        resetToAllView();
+    settingsSourceGroups().forEach(({ cat, sources }) => {
+      const label = document.createElement('p');
+      label.className = 'order-group-label';
+      label.textContent = CATEGORY_LABELS[cat] || cat;
+      container.appendChild(label);
+
+      const list = document.createElement('ul');
+      list.className = 'order-list';
+      list.innerHTML = sources.map(s => orderRowHtml(s.name, `
+        <input type="checkbox" ${effectiveSelected.includes(s.name) ? 'checked' : ''} aria-label="Afișează ${escapeHtml(s.name)}">
+        <span class="order-name">${escapeHtml(s.name)}</span>
+        <span class="order-tag">${escapeHtml(s.country)}</span>
+        ${failedSources.includes(s.name) ? '<span class="source-down">indisponibilă</span>' : ''}`)).join('');
+      container.appendChild(list);
+
+      list.querySelectorAll('.order-row').forEach(row => {
+        const name = row.dataset.id;
+        const checkbox = row.querySelector('input[type="checkbox"]');
+        // Toata linia (in afara de maner si sageti) bifeaza/debifeaza sursa
+        row.querySelector('.order-name').addEventListener('click', () => checkbox.click());
+        checkbox.addEventListener('change', () => {
+          const current = new Set(settings.selectedSources || discovered);
+          if (checkbox.checked) current.add(name); else current.delete(name);
+          settings.selectedSources = Array.from(current);
+          saveSettings(settings);
+          // Inainte: se resetau si categoriile selectate. Acum pastram selectia, scotem
+          // doar sursa debifata din ingustarea activa.
+          if (!checkbox.checked && activeSources.delete(name)) saveActiveFilters();
+          refreshFrontFilters();
+          renderCategoryOrderList();
+        });
       });
-      label.appendChild(checkbox);
-      label.appendChild(document.createTextNode(`${s.name} `));
-      const tagSpan = document.createElement('span');
-      tagSpan.textContent = s.country; // RO, GB, DE, FR ...
-      tagSpan.style.cssText = 'font-size:0.68rem;color:var(--ink-soft);border:1px solid var(--rule);border-radius:4px;padding:0.05rem 0.3rem;';
-      label.appendChild(tagSpan);
-      if (failedSources.includes(s.name)) {
-        const down = document.createElement('span');
-        down.className = 'source-down';
-        down.textContent = ' indisponibilă acum';
-        label.appendChild(down);
-      }
-      parent.appendChild(label);
-    }
-
-    // Fiecare categorie devine propriul "grup", ca sa nu se rupa intre cele
-    // doua coloane (break-inside: avoid, in CSS) cand afisam totul pe 2 coloane.
-    function addCategoryGroup(heading, sources) {
-      const group = document.createElement('div');
-      group.className = 'source-cat-group';
-      addHeading(group, heading);
-      sources.forEach(s => addSourceCheck(group, s));
-      container.appendChild(group);
-    }
-
-    // 1. Grupare pe categorie: sursele romanesti, plus cele de la IT/Tech
-    // (acolo se aduna si sursele internationale, ex. XDA Developers).
-    const byCategory = {};
-    sourceMeta.filter(s => s.country === 'RO' || s.category === 'IT').forEach(s => {
-      const cat = s.category || 'Altele';
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(s);
+      makeVerticalSortable(list, persistSourceOrder);
     });
-    Object.keys(byCategory).sort().forEach(cat => {
-      addCategoryGroup(CATEGORY_LABELS[cat] || cat, byCategory[cat]);
-    });
-
-    // 2. Restul surselor internationale (orice, in afara de IT/Tech), separat
-    const international = sourceMeta.filter(s => s.country !== 'RO' && s.category !== 'IT');
-    if (international.length > 0) {
-      addCategoryGroup('Internaționale', international);
-    }
 
     document.getElementById('selectAllBtn').onclick = () => {
       settings.selectedSources = null;
       saveSettings(settings);
       renderSourceChecklist();
-      resetToAllView();
+      renderCategoryOrderList();
+      refreshFrontFilters();
     };
   }
 
@@ -1597,189 +1806,24 @@
     return [...items].sort((a, b) => indexOf(keyFn(a)) - indexOf(keyFn(b)));
   }
 
-  // Reordonare prin tragere (mouse + atingere, via Pointer Events).
-  // Pe atingere, preluam controlul COMPLET al gestului chiar de la inceput
-  // (touch-action: none), ca sa nu se mai "lupte" cu scroll-ul nativ al
-  // browserului - problema reala din incercarile anterioare. Cat timp
-  // utilizatorul n-a apasat inca suficient de mult (LONG_PRESS_MS), orice
-  // miscare o interpretam noi insine ca scroll (mutam container.scrollLeft cu
-  // mana). Dupa ce trece apasarea lunga, fara sa se fi miscat mult, intram in
-  // modul de tragere (cu o mica vibratie, daca telefonul suporta) si abia
-  // atunci miscarea reordoneaza. O simpla atingere, fara sa astepti, ramane
-  // un tap normal de selectare. Cat timp tragi, nimic altceva nu se muta -
-  // doar o linie subtire arata unde ar ateriza elementul; reordonarea reala
-  // se intampla o singura data, la eliberare. Aproape de marginea vizibila,
-  // lista deruleaza singura, ca sa poti duce elementul si in afara ecranului.
-  function makeSortable(container, onReorder) {
-    const LONG_PRESS_MS = 400;
-    const SCROLL_INTENT_PX = 4; // miscare peste care, INAINTE de apasarea lunga, o tratam ca scroll
-    const EDGE_ZONE_PX = 40;
-    const EDGE_SCROLL_STEP = 9;
-
-    let suppressClick = false;
-    container.addEventListener('click', e => {
-      if (suppressClick) { e.stopPropagation(); e.preventDefault(); suppressClick = false; }
-    }, true);
-
-    const indicator = document.createElement('div');
-    indicator.className = 'tab-drop-indicator';
-    container.appendChild(indicator);
-
-    const items = Array.from(container.children).filter(el => el !== indicator);
-    items.forEach(el => {
-      el.style.touchAction = 'none'; // preluam noi tot controlul gestului, de la primul pixel
-      el.addEventListener('contextmenu', e => e.preventDefault());
-      el.addEventListener('pointerdown', e => {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        const dragEl = el;
-        const startX = e.clientX;
-        const startScrollLeft = container.scrollLeft;
-        const pointerId = e.pointerId;
-        let dragging = false;
-        let scrolling = false; // s-a stabilit deja ca gestul asta e un scroll, nu o tragere
-        let dropIndex = null;
-        let autoScrollTimer = null;
-
-        try { dragEl.setPointerCapture(pointerId); } catch {}
-
-        function siblings() {
-          return Array.from(container.children).filter(c => c !== dragEl && c !== indicator);
-        }
-        function computeDropIndex(clientX) {
-          const sibs = siblings();
-          for (let i = 0; i < sibs.length; i++) {
-            const rect = sibs[i].getBoundingClientRect();
-            if (clientX < rect.left + rect.width / 2) return i;
-          }
-          return sibs.length;
-        }
-        function showIndicatorAt(index) {
-          const sibs = siblings();
-          const containerRect = container.getBoundingClientRect();
-          let x;
-          if (sibs.length === 0) {
-            x = container.scrollLeft;
-          } else if (index >= sibs.length) {
-            const rect = sibs[sibs.length - 1].getBoundingClientRect();
-            x = rect.right - containerRect.left + container.scrollLeft;
-          } else {
-            const rect = sibs[index].getBoundingClientRect();
-            x = rect.left - containerRect.left + container.scrollLeft;
-          }
-          indicator.style.left = `${x - 2}px`;
-          indicator.classList.add('visible');
-        }
-        function updateAutoScroll(clientX) {
-          const rect = container.getBoundingClientRect();
-          clearInterval(autoScrollTimer);
-          autoScrollTimer = null;
-          if (clientX < rect.left + EDGE_ZONE_PX) {
-            autoScrollTimer = setInterval(() => {
-              container.scrollLeft -= EDGE_SCROLL_STEP;
-              dropIndex = computeDropIndex(clientX);
-              showIndicatorAt(dropIndex);
-            }, 16);
-          } else if (clientX > rect.right - EDGE_ZONE_PX) {
-            autoScrollTimer = setInterval(() => {
-              container.scrollLeft += EDGE_SCROLL_STEP;
-              dropIndex = computeDropIndex(clientX);
-              showIndicatorAt(dropIndex);
-            }, 16);
-          }
-        }
-        function stopAutoScroll() {
-          clearInterval(autoScrollTimer);
-          autoScrollTimer = null;
-        }
-
-        function startDragging() {
-          if (scrolling) return;
-          dragging = true;
-          suppressClick = true;
-          dragEl.classList.add('dragging');
-          if (navigator.vibrate) { try { navigator.vibrate(15); } catch {} }
-          dropIndex = computeDropIndex(startX);
-          showIndicatorAt(dropIndex);
-        }
-        const longPressTimer = setTimeout(startDragging, LONG_PRESS_MS);
-
-        function onMove(ev) {
-          if (ev.pointerId !== pointerId) return;
-          const dx = ev.clientX - startX;
-
-          if (!dragging) {
-            if (!scrolling && Math.abs(dx) > SCROLL_INTENT_PX) {
-              // Miscare clara inainte de apasarea lunga - utilizatorul vrea sa
-              // deruleze, nu sa mute butonul. Preluam noi scroll-ul cu mana,
-              // pentru ca touch-action:none a scos browserul din ecuatie.
-              scrolling = true;
-              clearTimeout(longPressTimer);
-            }
-            if (scrolling) {
-              ev.preventDefault();
-              container.scrollLeft = startScrollLeft - dx;
-            }
-            return;
-          }
-          ev.preventDefault();
-          dragEl.style.transform = `translateX(${dx}px)`;
-          dropIndex = computeDropIndex(ev.clientX);
-          showIndicatorAt(dropIndex);
-          updateAutoScroll(ev.clientX);
-        }
-        function onUp(ev) {
-          if (ev.pointerId !== pointerId) return;
-          clearTimeout(longPressTimer);
-          stopAutoScroll();
-          window.removeEventListener('pointermove', onMove);
-          window.removeEventListener('pointerup', onUp);
-          window.removeEventListener('pointercancel', onUp);
-          indicator.classList.remove('visible');
-          try { dragEl.releasePointerCapture(pointerId); } catch {}
-          if (dragging) {
-            dragEl.style.transform = '';
-            dragEl.classList.remove('dragging');
-            if (dropIndex !== null) {
-              const sibs = siblings();
-              if (dropIndex >= sibs.length) {
-                container.insertBefore(dragEl, indicator);
-              } else {
-                container.insertBefore(dragEl, sibs[dropIndex]);
-              }
-            }
-            onReorder(Array.from(container.children).filter(c => c !== indicator).map(c => c.dataset.dndId));
-            // Plasa de siguranta: pe atingere, dupa o tragere reala browserul de
-            // obicei NU mai trimite un eveniment "click" de finalizare - fara asta,
-            // suppressClick ar ramane blocat pe true si ar manca urmatoarea
-            // atingere reala a utilizatorului (exact bug-ul raportat).
-            setTimeout(() => { suppressClick = false; }, 60);
-          }
-        }
-        window.addEventListener('pointermove', onMove);
-        window.addEventListener('pointerup', onUp);
-        window.addEventListener('pointercancel', onUp);
-      });
-    });
-  }
-
-
   // ---- Randare taburi (categorii, selectie multipla) ----
-  function renderTabs() {
-    // O categorie apare in bara de taburi doar daca are cel putin o sursa activa
-    // (sourcesInCategory stie deja regulile speciale: International exclude IT,
-    // iar IT accepta si surse non-RO). 'Vremea' e speciala: apare doar daca exista
-    // efectiv cel putin o stire ce se potriveste cu vreo cuvant cheie de vreme.
-    const categories = applyCustomOrder(
+  // Categoriile care au cel putin o sursa activa, in ordinea aleasa in Setari.
+  // (Vremea e vizibila cat timp exista surse romanesti de actualitate.)
+  function visibleCategories() {
+    return applyCustomOrder(
       CATEGORY_ORDER.filter(c => c === 'Vremea' ? sourcesInCategory('Actualitati').length > 0 : sourcesInCategory(c).length > 0),
       settings.categoryOrder,
       c => c
     );
+  }
 
+  function renderTabs() {
+    const categories = visibleCategories();
     tabsEl.innerHTML = '';
     categories.forEach(cat => {
       const btn = document.createElement('button');
       btn.className = 'tab';
-      btn.dataset.dndId = cat;
+      btn.dataset.cat = cat;
       btn.textContent = CATEGORY_LABELS[cat] || cat;
       btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
       btn.addEventListener('click', () => {
@@ -1795,48 +1839,130 @@
       });
       tabsEl.appendChild(btn);
     });
-
-    makeSortable(tabsEl, newOrder => {
-      settings.categoryOrder = newOrder;
-      saveSettings(settings);
-    });
+    // Pe doua randuri inaltimea barei se poate schimba: recalculam pozitia barei de surse.
+    updateStickyOffsets();
   }
 
-  // ---- Randare rand secundar (surse individuale, selectie multipla) ----
+  // ---- Selectorul de surse: un rand-rezumat care se deschide intr-un panou ----
+  // Inlocuieste randul de butoane derulat lateral. Inchis ocupa un singur rand subtire;
+  // deschis arata toate sursele pe mai multe randuri, grupate (la Internațional, pe limbi).
+  const LANG_LABELS = { fr: 'Franceză', en: 'Engleză', de: 'Germană', ro: 'Română' };
+  const LANG_ORDER = ['ro', 'fr', 'en', 'de'];
+  let sourcePanelOpen = false;
+
+  function sourcePickerGroups(sources) {
+    const cats = visibleCategories().filter(c => activeCategories.has(c) && c !== 'Vremea');
+    const groups = [];
+    cats.forEach(cat => {
+      const inCat = new Set(sourcesInCategory(cat).map(s => s.name));
+      const catSources = sources.filter(s => inCat.has(s.name));
+      if (catSources.length === 0) return;
+      if (cat === 'International') {
+        const langs = [...new Set(catSources.map(s => s.lang || 'ro'))]
+          .sort((a, b) => (LANG_ORDER.indexOf(a) + 1 || 99) - (LANG_ORDER.indexOf(b) + 1 || 99));
+        langs.forEach(l => groups.push({
+          label: `${CATEGORY_LABELS[cat]} · ${LANG_LABELS[l] || l}`,
+          sources: catSources.filter(s => (s.lang || 'ro') === l)
+        }));
+      } else {
+        groups.push({ label: CATEGORY_LABELS[cat] || cat, sources: catSources });
+      }
+    });
+    return groups;
+  }
+
+  function closeSourcePanel() {
+    if (!sourcePanelOpen) return;
+    sourcePanelOpen = false;
+    renderSourceChips();
+  }
+
   function renderSourceChips() {
     subTabsEl.innerHTML = '';
-    if (activeCategories.size === 0) {
-      subTabsEl.classList.remove('visible');
-      return;
-    }
-    const sources = applyCustomOrder(sourcesInActiveCategories(), settings.sourceOrder, s => s.name);
+    const sources = activeCategories.size === 0
+      ? []
+      : applyCustomOrder(sourcesInActiveCategories(), settings.sourceOrder, s => s.name);
     if (sources.length <= 1) {
       subTabsEl.classList.remove('visible');
+      sourcePanelOpen = false;
       return;
     }
     subTabsEl.classList.add('visible');
 
-    sources.forEach(s => {
-      const btn = document.createElement('button');
-      btn.className = 'tab tab-sub';
-      btn.dataset.dndId = s.name;
-      btn.textContent = s.name;
-      btn.setAttribute('aria-pressed', String(activeSources.has(s.name)));
-      btn.addEventListener('click', () => {
-        if (activeSources.has(s.name)) activeSources.delete(s.name); else activeSources.add(s.name);
-        saveActiveFilters();
-        renderSourceChips();
-        renderList();
+    const selected = sources.filter(s => activeSources.has(s.name)).map(s => s.name);
+    const value = selected.length === 0
+      ? `Toate (${sources.length})`
+      : selected.length <= 2 ? selected.join(', ') : `${selected.slice(0, 2).join(', ')} +${selected.length - 2}`;
+
+    const summary = document.createElement('button');
+    summary.className = 'source-summary';
+    summary.type = 'button';
+    summary.setAttribute('aria-expanded', String(sourcePanelOpen));
+    summary.setAttribute('aria-controls', 'sourcePanel');
+    summary.innerHTML = `<span class="ss-label">Surse:</span><span class="ss-value">${escapeHtml(value)}</span><span class="ss-chevron" aria-hidden="true">▾</span>`;
+    summary.addEventListener('click', () => {
+      sourcePanelOpen = !sourcePanelOpen;
+      renderSourceChips();
+    });
+    subTabsEl.appendChild(summary);
+
+    const panel = document.createElement('div');
+    panel.className = 'source-panel';
+    panel.id = 'sourcePanel';
+    panel.hidden = !sourcePanelOpen;
+    const groups = sourcePickerGroups(sources);
+    const showLabels = groups.length > 1 || (groups[0] && groups[0].label.includes('·'));
+    groups.forEach(g => {
+      if (showLabels) {
+        const lbl = document.createElement('p');
+        lbl.className = 'panel-group-label';
+        lbl.textContent = g.label;
+        panel.appendChild(lbl);
+      }
+      const chips = document.createElement('div');
+      chips.className = 'panel-chips';
+      g.sources.forEach(s => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tab';
+        chip.textContent = s.name;
+        chip.setAttribute('aria-pressed', String(activeSources.has(s.name)));
+        chip.addEventListener('click', () => {
+          if (activeSources.has(s.name)) activeSources.delete(s.name); else activeSources.add(s.name);
+          saveActiveFilters();
+          renderSourceChips();   // panoul ramane deschis: poti alege mai multe surse la rand
+          renderList();
+        });
+        chips.appendChild(chip);
       });
-      subTabsEl.appendChild(btn);
+      panel.appendChild(chips);
     });
 
-    makeSortable(subTabsEl, newOrder => {
-      const prev = settings.sourceOrder || [];
-      settings.sourceOrder = [...newOrder, ...prev.filter(n => !newOrder.includes(n))];
-      saveSettings(settings);
+    const actions = document.createElement('div');
+    actions.className = 'panel-actions';
+    actions.innerHTML = `<button type="button" class="panel-link" data-act="all">Toate sursele</button>
+      <button type="button" class="panel-done" data-act="done">Gata</button>`;
+    actions.querySelector('[data-act="all"]').addEventListener('click', () => {
+      sources.forEach(s => activeSources.delete(s.name));
+      saveActiveFilters();
+      sourcePanelOpen = false;
+      renderSourceChips();
+      renderList();
     });
+    actions.querySelector('[data-act="done"]').addEventListener('click', closeSourcePanel);
+    panel.appendChild(actions);
+    subTabsEl.appendChild(panel);
   }
+
+  // Panoul se inchide la atingere in afara lui sau cu Escape. composedPath() e calculat
+  // la momentul evenimentului, deci functioneaza si cand butonul apasat a fost deja
+  // inlocuit in pagina (panoul se redeseneaza la fiecare alegere).
+  document.addEventListener('click', e => {
+    if (sourcePanelOpen && !e.composedPath().includes(subTabsEl)) closeSourcePanel();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSourcePanel();
+  });
 
   // ---- Randare listă ----
   // Ora afisata langa sursa. Datele estimate (Ziarul Lumina cu data editiei tiparite,
