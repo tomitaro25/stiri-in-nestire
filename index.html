@@ -916,7 +916,7 @@
 
     mainEl.innerHTML = `
       <div class="settings-page">
-        <button class="back-btn" id="backBtn">Înapoi la titluri</button>
+        <button class="back-btn" id="backBtn">Înapoi la setări</button>
         <h1 class="reading-title" style="margin-bottom:1rem;">Ajutor și informații</h1>
         <button class="help-link-btn" id="shareAppBtn">Recomandă aplicația unui prieten</button>
 
@@ -1905,6 +1905,13 @@
   let listObserver = null;
 
   function renderList(options = {}) {
+    // Daca lista apare din alta pagina (ex. un tab apasat din Setari, Ajutor sau Favorite),
+    // inlocuim intrarea curenta din istoric cu lista. Altfel, "inapoi" dintr-un articol
+    // deschis ulterior ar fi dus la pagina de dinainte, nu la titluri.
+    if (history.state && history.state.view && history.state.view !== 'list') {
+      history.replaceState({ view: 'list' }, '');
+      hasForwardEntry = false;
+    }
     currentView = 'list';
     const filtered = poolItems();
 
@@ -1971,9 +1978,10 @@
 
   // ---- Vizualizare articol ----
   function navigateToArticle(item) {
-    history.pushState({ view: 'article', item }, '');
+    const from = currentView === 'favorites' ? 'favorites' : 'list';
+    history.pushState({ view: 'article', item, from }, '');
     hasForwardEntry = false; // o navigare noua taie orice ramura de "inainte" existenta
-    renderArticleView(item);
+    renderArticleView(item, from);
   }
 
   // ---- Pagina articolului, in limba sursei ----
@@ -1982,7 +1990,7 @@
   // declarata per sursa). Restul aplicatiei ramane in romana.
   const READING_STRINGS = {
     ro: {
-      back: 'Înapoi la titluri', share: 'Distribuie', shareLabel: 'Distribuie articolul', copied: 'Link copiat ✓', fav: 'Favorit',
+      back: 'Înapoi la titluri', backFav: 'Înapoi la favorite', share: 'Distribuie', shareLabel: 'Distribuie articolul', copied: 'Link copiat ✓', fav: 'Favorit',
       loading: 'Se încarcă articolul…', original: 'Citește articolul pe site-ul original',
       offlineSaved: 'Text disponibil offline (salvat anterior).', approx: 'aprox.',
       incomplete: 'Textul pare scurt. Dacă articolul continuă, restul poate fi disponibil doar abonaților, pe site-ul original.',
@@ -1996,7 +2004,7 @@
       }
     },
     fr: {
-      back: 'Retour aux titres', share: 'Partager', shareLabel: 'Partager l’article', copied: 'Lien copié ✓', fav: 'Favori',
+      back: 'Retour aux titres', backFav: 'Retour aux favoris', share: 'Partager', shareLabel: 'Partager l’article', copied: 'Lien copié ✓', fav: 'Favori',
       loading: 'Chargement de l’article…', original: 'Lire l’article sur le site d’origine',
       offlineSaved: 'Texte disponible hors ligne (enregistré précédemment).', approx: 'env.',
       incomplete: 'Le texte semble court. Si l’article continue, la suite est peut-être réservée aux abonnés sur le site d’origine.',
@@ -2010,7 +2018,7 @@
       }
     },
     en: {
-      back: 'Back to headlines', share: 'Share', shareLabel: 'Share the article', copied: 'Link copied ✓', fav: 'Favourite',
+      back: 'Back to headlines', backFav: 'Back to favourites', share: 'Share', shareLabel: 'Share the article', copied: 'Link copied ✓', fav: 'Favourite',
       loading: 'Loading article…', original: 'Read the article on the original site',
       offlineSaved: 'Text available offline (saved earlier).', approx: 'approx.',
       incomplete: 'The text looks short. If the article continues, the rest may be for subscribers only on the original site.',
@@ -2024,7 +2032,7 @@
       }
     },
     de: {
-      back: 'Zurück zu den Schlagzeilen', share: 'Teilen', shareLabel: 'Artikel teilen', copied: 'Link kopiert ✓', fav: 'Favorit',
+      back: 'Zurück zu den Schlagzeilen', backFav: 'Zurück zu den Favoriten', share: 'Teilen', shareLabel: 'Artikel teilen', copied: 'Link kopiert ✓', fav: 'Favorit',
       loading: 'Artikel wird geladen…', original: 'Artikel auf der Originalseite lesen',
       offlineSaved: 'Text offline verfügbar (zuvor gespeichert).', approx: 'ca.',
       incomplete: 'Der Text wirkt kurz. Falls der Artikel weitergeht, ist der Rest auf der Originalseite womöglich nur für Abonnenten.',
@@ -2091,14 +2099,15 @@
     });
   }
 
-  async function renderArticleView(item) {
+  async function renderArticleView(item, from = 'list') {
     currentView = 'article';
     updateNavButtons();
     window.scrollTo(0, 0);
     markAsRead(item.link);
 
     const lang = langOf(item);
-    const t = READING_STRINGS[lang];
+    const t = { ...READING_STRINGS[lang] };
+    if (from === 'favorites') t.back = t.backFav;
     const metaHtml = `<p class="reading-meta"><span class="source-tag" style="color:${colorForSource(item.source)}">${escapeHtml(item.source)}</span>${isFutureDate(item.date) ? '' : ` · ${item.dateEstimated ? t.approx + ' ' : ''}${escapeHtml(formatFullDate(item.date, lang))}`}</p>`;
     const titleHtml = `<h1 class="reading-title">${escapeHtml(item.title)}</h1>`;
     const originalLink = `<a class="reading-source-link" href="${safeHref(item.link)}" target="_blank" rel="noopener">${escapeHtml(t.original)}</a>`;
@@ -2178,7 +2187,7 @@
     const state = event.state;
     if (state && state.view === 'article' && state.item) {
       hasForwardEntry = false;
-      renderArticleView(state.item);
+      renderArticleView(state.item, state.from || 'list');
       return;
     }
     if (state && state.view === 'settings') {
