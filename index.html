@@ -34,11 +34,12 @@
 
   /* Sepia: hartie de ziar imbatranita - fundal crem cald, cerneala maro inchis. */
   html[data-theme="sepia"] {
-    --paper: #EFE3C6;
-    --paper-raised: #E5D5B0;
-    --ink: #3B2F22;
-    --ink-soft: #6E5D47;
-    --rule: #D2BF98;
+    /* contrast text/fundal 12,9:1 (inainte 10,2:1), aproape de celelalte teme */
+    --paper: #E9DAB7;
+    --paper-raised: #DFCDA6;
+    --ink: #1F160D;
+    --ink-soft: #5A4A36;
+    --rule: #CDB98F;
     --teal: #7A4A26;
     --brick: #8E3B22;
     --nav-highlight: #7A4A26;
@@ -47,8 +48,8 @@
   html[data-theme="sepia"] .app {
     background-color: var(--paper);
     background-image:
-      radial-gradient(rgba(110, 80, 40, 0.07) 1px, transparent 1.2px),
-      radial-gradient(ellipse at center, transparent 55%, rgba(120, 85, 40, 0.10) 100%);
+      radial-gradient(rgba(110, 80, 40, 0.035) 1px, transparent 1.2px),
+      radial-gradient(ellipse at center, transparent 60%, rgba(120, 85, 40, 0.07) 100%);
     background-size: 4px 4px, 100% 100%;
     background-attachment: scroll, fixed;
   }
@@ -494,6 +495,8 @@
     background: var(--paper-raised);
   }
   html[data-theme="dark"] .reading-thumb { filter: brightness(0.88); }
+  /* Pe hartia sepia, textul articolului putin mai gros: literele subtiri se pierdeau */
+  html[data-theme="sepia"] .reading-body p { font-weight: 500; }
   /* La font foarte mare, coloana de langa imagine ar fi prea ingusta: imaginea trece deasupra */
   html[data-font-size="4"] .reading-thumb,
   html[data-font-size="5"] .reading-thumb { float: none; display: block; width: 45%; max-width: 180px; margin: 0 0 0.8em; }
@@ -872,7 +875,7 @@
   // Fiecare font se descarca doar cand e folosit (inainte: toate 4 la fiecare pornire,
   // blocand afisarea). Pagina de Setari le incarca pe toate, pentru previzualizare.
   const FONT_URLS = {
-    classic: 'https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap',
+    classic: 'https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap',
     modern: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
     reading: 'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap'
   };
@@ -939,7 +942,7 @@
     const shade = SHADE_PRESETS.find(s => s.id === settings.shade) || SHADE_PRESETS[0];
     // In tema Sepia, nuanta "Standard" inseamna cerneala maro a temei; celelalte nuante
     // pastreaza varianta lor pentru fundal deschis.
-    const ink = theme === 'dark' ? shade.dark : (theme === 'sepia' && shade.id === 'default') ? '#3B2F22' : shade.light;
+    const ink = theme === 'dark' ? shade.dark : (theme === 'sepia' && shade.id === 'default') ? '#1F160D' : shade.light;
     document.documentElement.style.setProperty('--ink', ink);
 
     const font = FONT_PRESETS.find(f => f.id === settings.fontFamily) || FONT_PRESETS[0];
@@ -2312,6 +2315,46 @@
   };
   const INCOMPLETE_TEXT_CHARS = 600;
 
+  // Despartire in silabe pentru romana. Telefoanele Android nu au dictionar de silabisire
+  // pentru romana, deci browserul nu despartea singur, iar textul justificat lasa spatii
+  // mari. Inseram cratime "invizibile" (U+00AD), afisate doar daca respectivul cuvant
+  // ajunge la capat de rand. Reguli DOOM, aplicate DOAR intre consoane - niciodata intre
+  // doua vocale, ca sa nu rupem diftongi (ea, ia, oa...). Minimum 3 litere pe fiecare parte.
+  // (Franceza, engleza, germana: le desparte browserul, care are dictionare pentru ele.)
+  const RO_VOWELS = new Set('aăâeiîouAĂÂEIÎOU'.split(''));
+  const RO_OBSTRUENTS = new Set('bcdfghptv'.split(''));
+  const RO_KEEP_TWO = ['ncș', 'ncş', 'nct', 'ncț', 'ncţ', 'nds', 'ndv', 'rct', 'rtf', 'stm'];
+  function hyphenateRoWord(word) {
+    const low = word.toLowerCase();
+    const units = []; // "ch" si "gh" sunt un singur sunet
+    for (let i = 0; i < low.length; i++) {
+      if ((low[i] === 'c' || low[i] === 'g') && low[i + 1] === 'h') { units.push({ s: i, e: i + 2, v: false }); i++; }
+      else units.push({ s: i, e: i + 1, v: RO_VOWELS.has(low[i]) });
+    }
+    const vowelIdx = units.map((u, i) => u.v ? i : -1).filter(i => i >= 0);
+    let out = '', last = 0;
+    for (let k = 0; k + 1 < vowelIdx.length; k++) {
+      const a = vowelIdx[k], b = vowelIdx[k + 1], cons = b - a - 1;
+      if (cons === 0) continue;
+      let at;
+      if (cons === 1) at = a + 1;                                        // ca-să
+      else if (cons === 2) {
+        const c1 = low.slice(units[a + 1].s, units[a + 1].e), c2 = low[units[a + 2].s];
+        at = (c1.length === 1 && RO_OBSTRUENTS.has(c1) && (c2 === 'l' || c2 === 'r')) ? a + 1 : a + 2; // a-cru / ar-tă
+      } else {
+        at = RO_KEEP_TWO.includes(low.slice(units[a + 1].s, units[a + 3].e)) ? a + 3 : a + 2;          // func-ție / con-stru-i
+      }
+      const pos = units[at].s;
+      if (pos < 3 || word.length - pos < 3) continue;
+      out += word.slice(last, pos) + '\u00AD';
+      last = pos;
+    }
+    return out + word.slice(last);
+  }
+  function hyphenateRo(text) {
+    return text.replace(/[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]{7,}/g, hyphenateRoWord);
+  }
+
   function langOf(item) {
     const meta = sourceMeta.find(s => s.name === item.source);
     const lang = (meta && meta.lang) || 'ro';
@@ -2403,7 +2446,8 @@
     show(`<div class="state">${escapeHtml(t.loading)}</div>`);
 
     function renderBody(text, notice) {
-      const paragraphs = text.split('\n\n').filter(p => p.trim()).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+      const paragraphs = text.split('\n\n').filter(p => p.trim())
+        .map(p => `<p>${escapeHtml(lang === 'ro' ? hyphenateRo(p) : p)}</p>`).join('');
       const shortNote = text.length < INCOMPLETE_TEXT_CHARS
         ? `<p class="reading-note">${escapeHtml(t.incomplete)}</p>` : '';
       show(`${metaWithTime(text)}${titleHtml}
