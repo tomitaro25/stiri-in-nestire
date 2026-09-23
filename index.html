@@ -590,17 +590,18 @@
   ul.list { list-style: none; margin: 0; padding: 0; }
   li.item { border-bottom: 1px solid var(--rule); position: relative; }
 
+  /* Miniatura "pluteste" in stanga: titlul curge pe langa ea si continua dedesubt, pe
+     toata latimea (inainte: doua coloane, cu spatiu gol langa poza la titlurile lungi). */
   button.item-btn {
     all: unset;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
+    display: block;
     width: 100%;
     padding: 1rem 2.6rem 1rem 1.25rem;
     cursor: pointer;
     box-sizing: border-box;
   }
   button.item-btn:hover, button.item-btn:focus-visible { background: var(--paper-raised); }
+  button.item-btn::after { content: ''; display: block; clear: both; }
   button.item-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 
   .fav-star {
@@ -618,14 +619,15 @@
   .fav-star:hover { color: var(--teal); }
 
   .item-thumb {
-    flex: 0 0 auto;
+    float: left;
+    margin: 0.15rem 0.8rem 0.3rem 0;
     width: 4.5rem;
     height: 4.5rem;
     border-radius: 8px;
     object-fit: cover;
     background: var(--paper-raised);
   }
-  .item-text { flex: 1; min-width: 0; }
+  .item-text { display: block; }
 
   .item-title {
     font-family: var(--font-title);
@@ -2246,7 +2248,11 @@
   function navigateToArticle(item, fromOverride) {
     rememberListPosition();
     const from = fromOverride || (currentView === 'favorites' ? 'favorites' : 'list');
-    history.pushState({ view: 'article', item, from }, '');
+    // Cate articole ai deschis la rand (prin "Articolul urmator"): butonul "Inapoi la
+    // titluri" sare peste toate deodata, direct la lista (sau la Favorite).
+    const depth = (currentView === 'article' && history.state && history.state.view === 'article')
+      ? (history.state.depth || 1) + 1 : 1;
+    history.pushState({ view: 'article', item, from, depth }, '');
     hasForwardEntry = false; // o navigare noua taie orice ramura de "inainte" existenta
     renderArticleView(item, from);
   }
@@ -2390,8 +2396,13 @@
     }
   }
 
+  function goBackToOrigin() {
+    const depth = (history.state && history.state.view === 'article' && history.state.depth) || 1;
+    history.go(-depth);
+  }
+
   function wireReadingHeader(item, t) {
-    document.getElementById('backBtn').addEventListener('click', goBackInApp);
+    document.getElementById('backBtn').addEventListener('click', goBackToOrigin);
     const shareBtn = document.getElementById('shareBtn');
     if (isHttpLink(item.link)) {
       shareBtn.addEventListener('click', () => shareLink(item.title, item.link, shareBtn, t.copied));
