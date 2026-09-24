@@ -459,6 +459,23 @@
     margin: 0.7rem 0 0.4rem;
   }
   .panel-group-label:first-child { margin-top: 0; }
+  button.panel-group-label {
+    all: unset;
+    display: block;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0.7rem 0 0.4rem;
+    padding: 0.15rem 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button.panel-group-label[aria-pressed="true"] { color: var(--teal); }
+  button.panel-group-label:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 4px; }
+  @media (hover: hover) { button.panel-group-label:hover { color: var(--teal); } }
+  .panel-hint { font-size: 0.74rem; color: var(--ink-soft); font-style: italic; margin: 0 0 0.2rem; }
   .panel-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
   .panel-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem; gap: 0.5rem; }
   .panel-link { all: unset; cursor: pointer; font-size: 0.8rem; color: var(--teal); }
@@ -1996,7 +2013,10 @@
   // ---- Selectorul de surse: un rand-rezumat care se deschide intr-un panou ----
   // Inlocuieste randul de butoane derulat lateral. Inchis ocupa un singur rand subtire;
   // deschis arata toate sursele pe mai multe randuri, grupate (la Internațional, pe limbi).
-  const LANG_LABELS = { fr: 'Franceză', en: 'Engleză', de: 'Germană', ro: 'Română' };
+  // Grupurile de limba sunt denumite in limba respectiva (cine citeste in franceza
+  // recunoaste imediat "Français").
+  const LANG_LABELS = { fr: 'Français', en: 'English', de: 'Deutsch', ro: 'Română' };
+  const INTERNATIONAL_BY_LANG = { ro: 'Internațional', fr: 'International', en: 'International', de: 'International' };
   const LANG_ORDER = ['ro', 'fr', 'en', 'de'];
   let sourcePanelOpen = false;
 
@@ -2011,7 +2031,7 @@
         const langs = [...new Set(catSources.map(s => s.lang || 'ro'))]
           .sort((a, b) => (LANG_ORDER.indexOf(a) + 1 || 99) - (LANG_ORDER.indexOf(b) + 1 || 99));
         langs.forEach(l => groups.push({
-          label: `${CATEGORY_LABELS[cat]} · ${LANG_LABELS[l] || l}`,
+          label: `${INTERNATIONAL_BY_LANG[l] || CATEGORY_LABELS[cat]} · ${LANG_LABELS[l] || l}`,
           sources: catSources.filter(s => (s.lang || 'ro') === l)
         }));
       } else {
@@ -2040,8 +2060,13 @@
     subTabsEl.classList.add('visible');
 
     const selected = sources.filter(s => activeSources.has(s.name)).map(s => s.name);
+    const groups = sourcePickerGroups(sources);
+    // grupul selectat integral si exclusiv (ex. doar sursele in franceza)
+    const exactGroup = selected.length > 1 && groups.find(g =>
+      g.sources.length === selected.length && g.sources.every(s => activeSources.has(s.name)));
     const value = selected.length === 0
       ? `Toate (${sources.length})`
+      : exactGroup ? `${exactGroup.label} (${selected.length})`
       : selected.length <= 2 ? selected.join(', ') : `${selected.slice(0, 2).join(', ')} +${selected.length - 2}`;
 
     const summary = document.createElement('button');
@@ -2060,13 +2085,30 @@
     panel.className = 'source-panel';
     panel.id = 'sourcePanel';
     panel.hidden = !sourcePanelOpen;
-    const groups = sourcePickerGroups(sources);
     const showLabels = groups.length > 1 || (groups[0] && groups[0].label.includes('·'));
+    if (groups.length > 1) {
+      const hint = document.createElement('p');
+      hint.className = 'panel-hint';
+      hint.textContent = 'Atinge un titlu de grup ca să alegi doar sursele lui.';
+      panel.appendChild(hint);
+    }
     groups.forEach(g => {
       if (showLabels) {
-        const lbl = document.createElement('p');
+        // Titlul grupului e un buton: o atingere = doar sursele acestui grup; a doua = toate.
+        const names = g.sources.map(s => s.name);
+        const isOnlyThis = exactGroup === g;
+        const lbl = document.createElement('button');
+        lbl.type = 'button';
         lbl.className = 'panel-group-label';
-        lbl.textContent = g.label;
+        lbl.setAttribute('aria-pressed', String(isOnlyThis));
+        lbl.textContent = (isOnlyThis ? '✓ ' : '') + g.label;
+        lbl.addEventListener('click', () => {
+          sources.forEach(s => activeSources.delete(s.name));
+          if (!isOnlyThis) names.forEach(n => activeSources.add(n));
+          saveActiveFilters();
+          renderSourceChips();
+          renderList();
+        });
         panel.appendChild(lbl);
       }
       const chips = document.createElement('div');
