@@ -497,9 +497,10 @@
   html[data-theme="dark"] .reading-thumb { filter: brightness(0.88); }
   /* Pe hartia sepia, textul articolului putin mai gros: literele subtiri se pierdeau */
   html[data-theme="sepia"] .reading-body p { font-weight: 500; }
-  /* La font foarte mare, coloana de langa imagine ar fi prea ingusta: imaginea trece deasupra */
+  /* Imaginea ramane mereu in dreapta sus, la orice marime de font. La fonturile mari
+     doar se micsoreaza putin, ca textul de langa ea sa nu ajunga la 8-10 litere pe rand. */
   html[data-font-size="4"] .reading-thumb,
-  html[data-font-size="5"] .reading-thumb { float: none; display: block; width: 45%; max-width: 180px; margin: 0 0 0.8em; }
+  html[data-font-size="5"] .reading-thumb { width: 26%; max-width: 100px; }
   .reading-body::after { content: ''; display: block; clear: both; }
 
   .next-article {
@@ -728,7 +729,7 @@
     text-justify: inter-word;
     -webkit-hyphens: auto;
     hyphens: auto;
-    hyphenate-limit-chars: 7 3 3; /* desparte doar cuvinte de minimum 7 litere, cu minimum 3 litere pe fiecare parte */
+    hyphenate-limit-chars: 6 2 3; /* cuvinte de minimum 6 litere; minimum 2 litere pe rand, 3 pe randul nou */
   }
   .reading-body p {
     font-family: var(--font-title);
@@ -2321,18 +2322,27 @@
   };
   const INCOMPLETE_TEXT_CHARS = 600;
 
-  // Despartire in silabe pentru romana. Telefoanele Android nu au dictionar de silabisire
-  // pentru romana, deci browserul nu despartea singur, iar textul justificat lasa spatii
-  // mari. Inseram cratime "invizibile" (U+00AD), afisate doar daca respectivul cuvant
-  // ajunge la capat de rand. Reguli DOOM, aplicate DOAR intre consoane - niciodata intre
-  // doua vocale, ca sa nu rupem diftongi (ea, ia, oa...). Minimum 3 litere pe fiecare parte.
+  // Despartire in silabe pentru romana, dupa regulile DOOM. Telefoanele Android nu au
+  // dictionar de silabisire pentru romana, deci browserul nu despartea singur. Inseram
+  // cratime "invizibile" (U+00AD), afisate doar daca respectivul cuvant ajunge la capat
+  // de rand. Reguli aplicate:
+  //  - V-CV: ca-să; "ch" si "gh" sunt un singur sunet (ches-tiu-ne)
+  //  - VC-CV: ar-tă; dar consoana + l/r trec impreuna: a-cru, ta-blă (exceptii: tl, dl -> at-las)
+  //  - trei consoane: as-pru; exceptiile DOOM lpt, mpt, mpț, nct, ncț, ncș, ndv, rct, rtf, stm: sculp-tor
+  //  - patru sau mai multe consoane: dupa a doua (ins-truc-ție, opt-spre-ze-ce)
+  //  - hiat: doar perechile care sunt INTOTDEAUNA hiat (po-e-zie, co-or-do-na); "ea", "ia", "io"...
+  //    pot fi si diftong, deci nu le despartim niciodata
+  //  - la capat de rand: minimum 2 litere pe rand, minimum 3 pe randul nou (previne
+  //    despartiri gresite ca "culo-ri", unde "i" final nu e silaba); abrevierile (NATO) nu se despart
   // (Franceza, engleza, germana: le desparte browserul, care are dictionare pentru ele.)
   const RO_VOWELS = new Set('aăâeiîouAĂÂEIÎOU'.split(''));
   const RO_OBSTRUENTS = new Set('bcdfghptv'.split(''));
-  const RO_KEEP_TWO = ['ncș', 'ncş', 'nct', 'ncț', 'ncţ', 'nds', 'ndv', 'rct', 'rtf', 'stm'];
+  const RO_KEEP_TWO = ['lpt', 'mpt', 'mpț', 'mpţ', 'nct', 'ncț', 'ncţ', 'ncș', 'ncş', 'ndv', 'rct', 'rtf', 'stm'];
+  const RO_ALWAYS_HIATUS = ['aa', 'ae', 'ao', 'ee', 'oe', 'oo', 'uu'];
   function hyphenateRoWord(word) {
+    if (word === word.toUpperCase()) return word;
     const low = word.toLowerCase();
-    const units = []; // "ch" si "gh" sunt un singur sunet
+    const units = [];
     for (let i = 0; i < low.length; i++) {
       if ((low[i] === 'c' || low[i] === 'g') && low[i + 1] === 'h') { units.push({ s: i, e: i + 2, v: false }); i++; }
       else units.push({ s: i, e: i + 1, v: RO_VOWELS.has(low[i]) });
@@ -2341,24 +2351,31 @@
     let out = '', last = 0;
     for (let k = 0; k + 1 < vowelIdx.length; k++) {
       const a = vowelIdx[k], b = vowelIdx[k + 1], cons = b - a - 1;
-      if (cons === 0) continue;
-      let at;
-      if (cons === 1) at = a + 1;                                        // ca-să
-      else if (cons === 2) {
+      let at = null;
+      if (cons === 0) {
+        if (RO_ALWAYS_HIATUS.includes(low[units[a].s] + low[units[b].s])) at = b;
+      } else if (cons === 1) {
+        at = a + 1;
+      } else if (cons === 2) {
         const c1 = low.slice(units[a + 1].s, units[a + 1].e), c2 = low[units[a + 2].s];
-        at = (c1.length === 1 && RO_OBSTRUENTS.has(c1) && (c2 === 'l' || c2 === 'r')) ? a + 1 : a + 2; // a-cru / ar-tă
+        const togetherOnNextLine = c1.length === 1 && RO_OBSTRUENTS.has(c1) && (c2 === 'l' || c2 === 'r')
+          && !(c2 === 'l' && (c1 === 't' || c1 === 'd'));
+        at = togetherOnNextLine ? a + 1 : a + 2;
+      } else if (cons === 3) {
+        at = RO_KEEP_TWO.includes(low.slice(units[a + 1].s, units[a + 3].e)) ? a + 3 : a + 2;
       } else {
-        at = RO_KEEP_TWO.includes(low.slice(units[a + 1].s, units[a + 3].e)) ? a + 3 : a + 2;          // func-ție / con-stru-i
+        at = a + 3;
       }
+      if (at === null) continue;
       const pos = units[at].s;
-      if (pos < 3 || word.length - pos < 3) continue;
+      if (pos < 2 || word.length - pos < 3) continue;
       out += word.slice(last, pos) + '\u00AD';
       last = pos;
     }
     return out + word.slice(last);
   }
   function hyphenateRo(text) {
-    return text.replace(/[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]{7,}/g, hyphenateRoWord);
+    return text.replace(/[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]{6,}/g, hyphenateRoWord);
   }
 
   function langOf(item) {
