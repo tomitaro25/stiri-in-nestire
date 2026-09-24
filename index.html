@@ -4,11 +4,24 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Știri în neștire</title>
+<meta name="description" content="Știri din peste 35 de surse, românești și internaționale, într-un singur loc. Fără cont, fără abonament, fără reclame.">
+<!-- Previzualizarea linkului cand e trimis in WhatsApp, Messenger, Facebook, LinkedIn etc. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Știri în neștire">
+<meta property="og:title" content="Știri în neștire — știri fără reclame">
+<meta property="og:description" content="Peste 35 de surse, românești și internaționale, într-un singur loc. Fără cont, fără abonament, fără reclame.">
+<meta property="og:url" content="https://tomitaro25.github.io/stiri-in-nestire/">
+<meta property="og:image" content="https://tomitaro25.github.io/stiri-in-nestire/icons/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Știri în neștire — peste 35 de surse, fără cont, fără reclame">
+<meta property="og:locale" content="ro_RO">
+<meta name="twitter:card" content="summary_large_image">
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2C5F63" id="themeColorMeta">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Neștire">
+<meta name="apple-mobile-web-app-title" content="neȘtire">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -217,6 +230,10 @@
     margin-bottom: 1.2rem;
   }
   .help-link-btn:hover { background: var(--paper); }
+  .action-row { display: flex; gap: 0.5rem; margin: -0.6rem 0 1.2rem; }
+  .action-row .help-link-btn { margin-bottom: 0; flex: 1; font-size: 0.82rem; padding: 0.6rem 0.5rem; }
+  .action-row .help-link-btn[hidden] { display: none; }
+  .install-share-icon { width: 1.05em; height: 1.05em; vertical-align: -0.15em; margin: 0 0.15em; }
   .help-text p {
     font-size: calc(0.88rem * var(--content-scale));
     line-height: 1.55;
@@ -999,6 +1016,10 @@
         <h1 class="reading-title" style="margin-bottom:0.9rem;">Setări</h1>
 
         <button class="help-link-btn" id="helpLinkBtn">❓ Ajutor și informații despre aplicație</button>
+        <div class="action-row">
+          <button class="help-link-btn" id="settingsInstallBtn" hidden>📲 Instalează aplicația</button>
+          <button class="help-link-btn" id="settingsShareBtn">Recomandă aplicația</button>
+        </div>
 
         <div class="settings-row">
           <div class="settings-col">
@@ -1064,6 +1085,7 @@
 
     document.getElementById('backBtn').addEventListener('click', goBackInApp);
     document.getElementById('helpLinkBtn').addEventListener('click', navigateToHelp);
+    wireInstallAndShareButtons('settingsInstallBtn', 'settingsShareBtn');
 
     wireSegmented(document.getElementById('themeGroup'), settings.theme, value => {
       settings.theme = value; saveSettings(settings); applyVisualSettings();
@@ -1129,7 +1151,10 @@
       <div class="settings-page">
         <button class="back-btn" id="backBtn">Înapoi la setări</button>
         <h1 class="reading-title" style="margin-bottom:1rem;">Ajutor și informații</h1>
-        <button class="help-link-btn" id="shareAppBtn">Recomandă aplicația unui prieten</button>
+        <div class="action-row">
+          <button class="help-link-btn" id="helpInstallBtn" hidden>📲 Instalează aplicația</button>
+          <button class="help-link-btn" id="shareAppBtn">Recomandă aplicația</button>
+        </div>
 
         <div class="settings-group">
           <p class="settings-label">Cum funcționează aplicația</p>
@@ -1179,9 +1204,7 @@
       </div>`;
 
     document.getElementById('backBtn').addEventListener('click', goBackInApp);
-    const shareAppBtn = document.getElementById('shareAppBtn');
-    shareAppBtn.addEventListener('click', () =>
-      shareLink('Știri în neștire — știri fără reclame', new URL('./', location.href).href, shareAppBtn));
+    wireInstallAndShareButtons('helpInstallBtn', 'shareAppBtn');
   }
 
   // ---- Pagina de Favorite ----
@@ -2396,9 +2419,9 @@
   }
 
   // Distribuire prin meniul nativ al telefonului; pe calculator, copiere in clipboard.
-  async function shareLink(title, url, button, copiedText = 'Link copiat ✓') {
+  async function shareLink(title, url, button, copiedText = 'Link copiat ✓', text) {
     if (navigator.share) {
-      try { await navigator.share({ title, url }); } catch {}
+      try { await navigator.share(text ? { title, text, url } : { title, url }); } catch {}
       return;
     }
     try {
@@ -2436,6 +2459,7 @@
 
   async function renderArticleView(item, from = 'list') {
     currentView = 'article';
+    try { localStorage.setItem('stiriNestireEngaged', '1'); } catch {}
     updateNavButtons();
     window.scrollTo(0, 0);
     markAsRead(item.link);
@@ -2576,12 +2600,18 @@
   }, { passive: true });
   [tabsEl, subTabsEl].forEach(el => el.addEventListener('focusin', () => setFiltersHidden(false)));
 
+  var installLogicReady = false; // devine true dupa ce blocul de instalare (la finalul scriptului) e initializat
+
   // Apelat la fiecare schimbare de pagina (prin updateNavButtons)
   function onViewChanged() {
     document.documentElement.classList.toggle('view-article', currentView === 'article');
     if (currentView !== 'article') setFiltersHidden(false);
     lastScrollY = window.scrollY;
     updateReadingProgress();
+    if (installLogicReady) {
+      if (currentView === 'article') hideInstallBanner(); // nu acoperim textul pe care il citesti
+      else maybeShowInstallBanner();
+    }
   }
 
   function updateNavButtons() {
@@ -2728,32 +2758,80 @@
   loadFeed();
   offlinePrune();
 
-  // ---- Instalare: banner propriu la prima deschidere, in loc sa astepti meniul browserului ----
-  const INSTALL_DISMISSED_KEY = 'stiriNestireInstallDismissed';
+  // ---- Instalare ----
+  // - Bannerul apare dupa ce utilizatorul a citit primul articol (sau dupa ~40 de secunde),
+  //   cand a inteles ce face aplicatia - nu din prima secunda. Nu apare peste un articol.
+  // - In browserele interne (Facebook, Messenger, Instagram, TikTok...) instalarea nu e
+  //   posibila: aratam imediat cum sa deschida pagina in Chrome/Safari.
+  // - Inchis cu ✕: revine discret dupa 14 zile. Din Setari si Ajutor se poate instala oricand.
+  const INSTALL_DISMISSED_KEY = 'stiriNestireInstallDismissed'; // momentul ultimei inchideri
+  const INSTALLED_KEY = 'stiriNestireInstalled';
+  const ENGAGED_KEY = 'stiriNestireEngaged';
+  const INSTALL_SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
+  const APP_SHARE_TEXT = 'Știri din peste 35 de surse, românești și internaționale. Fără cont, fără reclame.';
+  const IOS_SHARE_ICON = '<svg class="install-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8"/></svg>';
   let deferredInstallPrompt = null;
 
   function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   }
   function isIOS() {
-    return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    // iPad-urile noi se prezinta drept Mac; le recunoastem dupa ecranul tactil
+    return /iphone|ipad|ipod/i.test(navigator.userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+  function isAndroid() { return /android/i.test(navigator.userAgent); }
+  function isInAppBrowser() {
+    return /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger|Line\/|musical_ly|BytedanceWebview|Snapchat|LinkedInApp|GSA\/|; wv\)/i
+      .test(navigator.userAgent);
+  }
+  function canOfferInstall() {
+    return !isStandalone() && !localStorage.getItem(INSTALLED_KEY);
+  }
+  function installSnoozed() {
+    const t = Number(localStorage.getItem(INSTALL_DISMISSED_KEY) || 0);
+    return t > 0 && Date.now() - t < INSTALL_SNOOZE_MS;
+  }
+  function currentInstallMode() {
+    if (isInAppBrowser()) return 'inapp';
+    if (deferredInstallPrompt) return 'prompt';
+    if (isIOS()) return 'ios';
+    return 'manual'; // alte browsere (ex. Firefox pe PC): doar indicatii
   }
 
   function showInstallBanner(mode) {
-    if (isStandalone()) return; // deja instalata/deschisa ca aplicatie
-    if (localStorage.getItem(INSTALL_DISMISSED_KEY)) return;
     if (document.getElementById('updateBanner').classList.contains('visible')) return; // update-ul are prioritate
-
     const banner = document.getElementById('installBanner');
     const textEl = document.getElementById('installBannerText');
     const actionBtn = document.getElementById('installActionBtn');
+    actionBtn.style.display = '';
+    actionBtn.onclick = null;
 
-    if (mode === 'ios') {
-      textEl.textContent = 'Adaugă aplicația pe ecranul principal: atinge Distribuire, apoi „Adaugă pe ecranul principal".';
+    if (mode === 'prompt') {
+      textEl.textContent = 'Instalează aplicația: pornește din iconiță, pe tot ecranul, ca orice altă aplicație.';
+      actionBtn.textContent = 'Instalează';
+      actionBtn.onclick = runInstallPrompt;
+    } else if (mode === 'ios') {
+      textEl.innerHTML = `Adaugă aplicația pe ecranul principal: <b>1.</b> atinge ${IOS_SHARE_ICON}<b>Partajare</b> · <b>2.</b> alege „Adaugă pe ecranul principal".`;
       actionBtn.style.display = 'none';
+    } else if (mode === 'inapp') {
+      if (isAndroid()) {
+        textEl.textContent = 'Ești în browserul intern al altei aplicații, unde instalarea nu e posibilă. Deschide pagina în Chrome ca s-o poți instala.';
+        actionBtn.textContent = 'Deschide în Chrome';
+        actionBtn.onclick = () => {
+          location.href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(location.href)};end`;
+        };
+      } else {
+        textEl.textContent = 'Ești în browserul intern al altei aplicații, unde instalarea nu e posibilă. Copiază linkul și deschide-l în Safari.';
+        actionBtn.textContent = 'Copiază linkul';
+        actionBtn.onclick = async () => {
+          try { await navigator.clipboard.writeText(new URL('./', location.href).href); actionBtn.textContent = 'Link copiat ✓'; }
+          catch { window.prompt('Copiază linkul:', new URL('./', location.href).href); }
+        };
+      }
     } else {
-      textEl.textContent = 'Instalează aplicația pentru acces rapid, ca orice altă aplicație.';
-      actionBtn.style.display = '';
+      textEl.textContent = 'Folosește meniul browserului: „Instalează aplicația" sau „Adaugă pe ecranul principal". Pe PC, instalarea merge în Chrome și Edge.';
+      actionBtn.style.display = 'none';
     }
     banner.classList.add('visible');
   }
@@ -2762,36 +2840,77 @@
     document.getElementById('installBanner').classList.remove('visible');
   }
 
-  // Android si PC (Chrome/Edge): browserul ne anunta cand aplicatia e instalabila
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    showInstallBanner('android-pc');
-  });
-
-  document.getElementById('installActionBtn').addEventListener('click', async () => {
+  async function runInstallPrompt() {
     hideInstallBanner();
     if (!deferredInstallPrompt) return;
     deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
+    const choice = await deferredInstallPrompt.userChoice;
     deferredInstallPrompt = null;
-    localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+    if (choice && choice.outcome === 'accepted') localStorage.setItem(INSTALLED_KEY, '1');
+    else localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
+    refreshInstallButtons();
+  }
+
+  // Oferta automata: doar pe lista, doar dupa implicare, doar daca nu a fost amanata.
+  function maybeShowInstallBanner() {
+    if (!canOfferInstall() || installSnoozed()) return;
+    const mode = currentInstallMode();
+    if (mode === 'manual') return; // fara buton de instalare: nu insistam, ramane in Setari/Ajutor
+    if (mode !== 'inapp') {
+      if (currentView !== 'list' || !localStorage.getItem(ENGAGED_KEY)) return;
+    }
+    showInstallBanner(mode);
+  }
+
+  // Butoanele permanente din Setari si Ajutor
+  function wireInstallAndShareButtons(installId, shareId) {
+    const installBtn = document.getElementById(installId);
+    const shareBtn = document.getElementById(shareId);
+    if (installBtn) {
+      installBtn.hidden = !canOfferInstall();
+      installBtn.addEventListener('click', () => {
+        const mode = currentInstallMode();
+        if (mode === 'prompt') runInstallPrompt(); else showInstallBanner(mode);
+      });
+    }
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () =>
+        shareLink('Știri în neștire', new URL('./', location.href).href, shareBtn, 'Link copiat ✓', APP_SHARE_TEXT));
+    }
+  }
+  function refreshInstallButtons() {
+    ['settingsInstallBtn', 'helpInstallBtn'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.hidden = !canOfferInstall();
+    });
+  }
+
+  // Android si PC (Chrome/Edge/Samsung): browserul anunta ca aplicatia e instalabila
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    maybeShowInstallBanner();
   });
 
   document.getElementById('installDismissBtn').addEventListener('click', () => {
     hideInstallBanner();
-    localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+    localStorage.setItem(INSTALL_DISMISSED_KEY, String(Date.now()));
   });
 
   window.addEventListener('appinstalled', () => {
     hideInstallBanner();
-    localStorage.setItem(INSTALL_DISMISSED_KEY, '1');
+    localStorage.setItem(INSTALLED_KEY, '1');
+    refreshInstallButtons();
   });
 
-  // iOS (Safari): "beforeinstallprompt" nu exista deloc acolo - aratam noi indicatia manuala
-  if (isIOS() && !isStandalone() && !localStorage.getItem(INSTALL_DISMISSED_KEY)) {
-    showInstallBanner('ios');
-  }
+  // Implicare: primul articol citit (marcat in pagina articolului) sau ~40 de secunde in aplicatie
+  setTimeout(() => {
+    localStorage.setItem(ENGAGED_KEY, '1');
+    maybeShowInstallBanner();
+  }, 40000);
+  // Browser intern: aratam indicatia devreme, inainte ca omul sa inchida pagina
+  if (isInAppBrowser()) setTimeout(maybeShowInstallBanner, 2500);
+  installLogicReady = true;
 
   // ---- Detectare versiune noua a aplicatiei ----
   if ('serviceWorker' in navigator) {
