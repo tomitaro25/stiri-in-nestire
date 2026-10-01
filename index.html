@@ -83,6 +83,7 @@
   html[data-font-size="3"] { --content-scale: 1.15; }
   html[data-font-size="4"] { --content-scale: 1.3; }
   html[data-font-size="5"] { --content-scale: 1.45; }
+  html[data-font-size="6"] { --content-scale: 1.6; }
 
   * { box-sizing: border-box; }
 
@@ -607,7 +608,8 @@
   /* Imaginea ramane mereu in dreapta sus, la orice marime de font. La fonturile mari
      doar se micsoreaza putin, ca textul de langa ea sa nu ajunga la 8-10 litere pe rand. */
   html[data-font-size="4"] .reading-thumb,
-  html[data-font-size="5"] .reading-thumb { width: 26%; max-width: 100px; }
+  html[data-font-size="5"] .reading-thumb,
+  html[data-font-size="6"] .reading-thumb { width: 26%; max-width: 100px; }
   .reading-body::after { content: ''; display: block; clear: both; }
 
   .next-article {
@@ -830,9 +832,6 @@
      silabe ca sa nu apara spatii mari intre cuvinte pe ecrane inguste. Browserul
      desparte dupa limba articolului (atributul lang de pe .reading). Titlurile raman
      aliniate la stanga: rândurile lor scurte ar arata rau intinse intre margini. */
-  /* Alineat la inceputul fiecarui paragraf (ca in carti si presa tiparita), mai putin la
-     primul - acolo e evident unde incepe textul. */
-  .reading-body p + p { text-indent: 1.5em; }
   html[data-text-align="justify"] .reading-body p {
     text-align: justify;
     text-justify: inter-word;
@@ -845,7 +844,7 @@
     font-size: calc(1.125rem * var(--content-scale));
     line-height: 1.6;
     max-width: 66ch;
-    margin: 0 0 0.85em;
+    margin: 0 0 1.1em;
     color: var(--ink);
   }
 
@@ -934,7 +933,7 @@
       <button class="nav-btn nav-arrow" id="forwardBtnTop" aria-label="Înainte">→</button>
       <button class="nav-btn filter-btn" id="filterBtnTop" aria-controls="filterSheet" aria-expanded="false" aria-label="Categorii și surse"><span class="fb-icon" aria-hidden="true">☰</span><span class="fb-label"></span><span class="fb-chev" aria-hidden="true">▾</span></button>
       <span class="font-size-label" aria-hidden="true">Aa</span>
-      <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="5" step="1" aria-label="Mărime font">
+      <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="6" step="1" aria-label="Mărime font">
     </nav>
 
     <nav class="tabs" id="tabs"></nav>
@@ -948,7 +947,7 @@
       <button class="nav-btn nav-arrow" id="forwardBtnBottom" aria-label="Înainte">→</button>
       <button class="nav-btn filter-btn" id="filterBtnBottom" aria-controls="filterSheet" aria-expanded="false" aria-label="Categorii și surse"><span class="fb-icon" aria-hidden="true">☰</span><span class="fb-label"></span><span class="fb-chev" aria-hidden="true">▴</span></button>
       <span class="font-size-label" aria-hidden="true">Aa</span>
-      <input type="range" class="font-size-slider" id="fontSizeSliderBottom" min="1" max="5" step="1" aria-label="Mărime font">
+      <input type="range" class="font-size-slider" id="fontSizeSliderBottom" min="1" max="6" step="1" aria-label="Mărime font">
     </nav>
 
     <!-- UN SINGUR panou de filtre: se deschide fie jos (de la butonul din bara de jos),
