@@ -42,7 +42,6 @@
     --font-body: 'IBM Plex Sans', sans-serif;
     --content-scale: 1;
     --navbar-top-h: 44px; /* inaltimea reala a barei fixe de sus - actualizata din JS */
-    --tabs-h: 45px; /* inaltimea reala a randului de taburi de categorii - actualizata din JS */
   }
 
   /* Sepia: hartie de ziar imbatranita - fundal crem cald, cerneala maro inchis. */
@@ -60,11 +59,18 @@
   /* Granulatie fina de hartie si margini usor intunecate, ca la o foaie veche. */
   html[data-theme="sepia"] .app {
     background-color: var(--paper);
-    background-image:
-      radial-gradient(rgba(110, 80, 40, 0.035) 1px, transparent 1.2px),
-      radial-gradient(ellipse at center, transparent 60%, rgba(120, 85, 40, 0.07) 100%);
-    background-size: 4px 4px, 100% 100%;
-    background-attachment: scroll, fixed;
+    background-image: radial-gradient(rgba(110, 80, 40, 0.035) 1px, transparent 1.2px);
+    background-size: 4px 4px;
+  }
+  /* Marginile intunecate stau pe un strat fix separat (nu "background-attachment: fixed",
+     care pe telefoane forta redesenarea intregii pagini la fiecare pas de derulare). */
+  html[data-theme="sepia"] body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(120, 85, 40, 0.07) 100%);
   }
 
   html[data-theme="dark"] {
@@ -148,23 +154,6 @@
     text-overflow: ellipsis;
   }
 
-  .offline-download-btn {
-    all: unset;
-    display: block;
-    max-width: 100%;
-    box-sizing: border-box;
-    margin: 0.4rem 0 0;
-    font-size: 0.75rem;
-    color: var(--teal);
-    cursor: pointer;
-    border-bottom: 1px dotted var(--teal);
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .offline-download-btn:hover { opacity: 0.8; }
-  .offline-download-btn:disabled { opacity: 0.5; cursor: default; }
 
   .offline-status {
     margin: 0.3rem 0 0;
@@ -357,34 +346,8 @@
     display: inline-block;
   }
 
-  /* ---- Categorii (sus) si selectorul de surse, fixate la derulare ---- */
-  /* Fundal usor translucid, cu estompare: continutul care trece pe dedesubt ramane
-     vag vizibil, efect modern discret (cu fundal solid ca rezerva pe browsere vechi). */
-  nav.tabs {
-    position: relative;
-    background: var(--paper);
-    background: color-mix(in srgb, var(--paper) 90%, transparent);
-    -webkit-backdrop-filter: saturate(1.4) blur(10px);
-    backdrop-filter: saturate(1.4) blur(10px);
-    display: flex;
-    flex-wrap: wrap;           /* categoriile trec pe al doilea rand, fara derulare laterala */
-    gap: 0.35rem;
-    padding: 0.6rem 1rem;
-    border-bottom: 1px solid var(--rule);
-  }
 
-  nav.tabs-sub {
-    position: relative;
-    display: none;
-    padding: 0.35rem 1rem;
-    border-bottom: 1px solid var(--rule);
-    background: var(--paper-raised);
-    background: color-mix(in srgb, var(--paper-raised) 92%, transparent);
-    -webkit-backdrop-filter: saturate(1.4) blur(10px);
-    backdrop-filter: saturate(1.4) blur(10px);
-  }
-  nav.tabs-sub.visible { display: block; }
-
+  /* Butoanele-chip de categorii si surse din panoul de filtre */
   .tab {
     appearance: none;
     border: 1px solid var(--rule);
@@ -411,51 +374,6 @@
     font-weight: 600;
   }
 
-  /* Rezumatul surselor: un singur rand, se deschide la atingere */
-  .source-summary {
-    all: unset;
-    box-sizing: border-box;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    font-size: 0.84rem;
-    color: var(--ink);
-    padding: 0.3rem 0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .source-summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 6px; }
-  .ss-label { color: var(--ink-soft); flex-shrink: 0; }
-  .ss-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
-  .ss-chevron { color: var(--teal); transition: transform 0.2s; flex-shrink: 0; }
-  .source-summary[aria-expanded="true"] .ss-chevron { transform: rotate(180deg); }
-
-  .source-panel {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 100%;
-    max-height: min(60vh, 440px);
-    overflow-y: auto;
-    background: var(--paper-raised);
-    border-bottom: 1px solid var(--rule);
-    border-radius: 0 0 14px 14px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22);
-    padding: 0.7rem 1rem 0.9rem;
-  }
-  .source-panel[hidden] { display: none; }
-  .source-panel:not([hidden]) { animation: nestire-panel-in 0.16s ease-out; }
-  @keyframes nestire-panel-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  .panel-group-label {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--ink-soft);
-    margin: 0.7rem 0 0.4rem;
-  }
-  .panel-group-label:first-child { margin-top: 0; }
   button.panel-group-label {
     all: unset;
     display: block;
@@ -474,25 +392,8 @@
   @media (hover: hover) { button.panel-group-label:hover { color: var(--teal); } }
   .panel-hint { font-size: 0.74rem; color: var(--ink-soft); font-style: italic; margin: 0 0 0.2rem; }
   .panel-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
-  .panel-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem; gap: 0.5rem; }
   .panel-link { all: unset; cursor: pointer; font-size: 0.8rem; color: var(--teal); }
-  .panel-done {
-    all: unset;
-    cursor: pointer;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--paper);
-    background: var(--teal);
-    padding: 0.4rem 1rem;
-    border-radius: 999px;
-  }
 
-  /* In pagina de articol, barele de filtre se retrag la derularea in jos si revin la
-     derularea in sus (sau cand mouse-ul se apropie de marginea de sus, pe PC). */
-
-  /* Randurile de categorii/surse de la inceputul listei nu se mai afiseaza: totul se
-     alege din panoul deschis de butonul "☰" (lista ramane aerisita de la primul titlu). */
-  nav.tabs, nav.tabs-sub, nav.tabs-sub.visible { display: none !important; }
 
   /* ---- Butoanele de filtre din bare si panoul de filtre ---- */
   .nav-arrow { padding: 0.35rem 0.7rem; font-size: 0.95rem; }
@@ -540,7 +441,6 @@
     font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
     color: var(--ink-soft); margin: 0 0 0.45rem;
   }
-  .sheet-section-label.spaced { margin-top: 1rem; }
   .sheet-grabber { width: 42px; height: 5px; border-radius: 3px; background: var(--rule); margin: 0 auto 0.8rem; }
   .filter-sheet.top .sheet-grabber { margin: 0.8rem auto 0; }
   .sheet-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.45rem; }
@@ -743,7 +643,7 @@
     cursor: pointer;
     font-size: 1.15rem;
     line-height: 1;
-    color: var(--rule);
+    color: var(--ink-soft);
     padding: 0.2rem;
   }
   .fav-star.active { color: var(--nav-highlight); }
@@ -924,6 +824,12 @@
     cursor: pointer;
     white-space: nowrap;
   }
+  /* Accesibilitate: contur vizibil la navigarea cu tastatura (Tab) pe orice buton sau camp.
+     Regulile mai specifice de mai sus (ex. button.item-btn) isi pastreaza varianta lor. */
+  button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -932,7 +838,7 @@
       <div class="masthead-text">
         <p class="wordmark">Știri în neștire</p>
         <p class="tagline">Fără cont, fără abonament. Fără reclame, fără zgomot.</p>
-        <p class="offline-status" id="offlineStatus"></p>
+        <p class="offline-status" id="offlineStatus" role="status"></p>
       </div>
       <div class="header-actions">
         <button class="icon-btn" id="refreshBtn" aria-label="Reîmprospătează știrile">↻</button>
@@ -943,7 +849,7 @@
     </header>
 
     <div class="search-bar" id="searchBar">
-      <input type="text" id="searchInput" placeholder="Caută în titluri…" autocomplete="off">
+      <input type="text" id="searchInput" placeholder="Caută în titluri…" aria-label="Caută în titluri" autocomplete="off">
     </div>
 
     <div class="read-progress" aria-hidden="true"><div class="read-progress-fill" id="readProgressFill"></div></div>
@@ -955,8 +861,6 @@
       <input type="range" class="font-size-slider" id="fontSizeSliderTop" min="1" max="6" step="1" aria-label="Mărime font">
     </nav>
 
-    <nav class="tabs" id="tabs"></nav>
-    <nav class="tabs tabs-sub" id="subTabs"></nav>
     <main id="main">
       <div class="state">Se încarcă titlurile…</div>
     </main>
@@ -974,7 +878,7 @@
     <div class="filter-sheet" id="filterSheet" role="dialog" aria-label="Categorii și surse" hidden></div>
     <div class="filter-hint" id="filterHint" role="status" hidden>Aici alegi categoriile și sursele</div>
 
-    <div class="update-banner" id="updateBanner">
+    <div class="update-banner" id="updateBanner" role="status">
       <span>O versiune nouă e disponibilă.</span>
       <button id="updateReloadBtn">Reîncarcă</button>
     </div>
@@ -1097,7 +1001,7 @@
     if (sliderTop) sliderTop.value = settings.fontSize;
     if (sliderBottom) sliderBottom.value = settings.fontSize;
 
-    if (typeof updateStickyOffsets === 'function') updateStickyOffsets(); // fontul poate schimba usor inaltimea taburilor
+    if (typeof updateStickyOffsets === 'function') updateStickyOffsets(); // fontul poate schimba usor inaltimea barelor
   }
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -1437,9 +1341,16 @@
         renderList();
       }
     });
+    // Lista se redeseneaza la ~150 ms dupa ultima litera, nu la fiecare tasta.
+    let searchTimer = null;
     document.getElementById('searchInput').addEventListener('input', e => {
-      searchQuery = e.target.value.trim().toLowerCase();
-      renderList();
+      const value = e.target.value.trim().toLowerCase();
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        if (value === searchQuery) return;
+        searchQuery = value;
+        renderList();
+      }, 150);
     });
   }
 
@@ -1562,8 +1473,7 @@
   // Dupa orice schimbare in Setari, prima pagina se actualizeaza imediat
   // (barele de categorii si surse raman vizibile si pe pagina de Setari).
   function refreshFrontFilters() {
-    renderTabs();
-    renderSourceChips();
+    refreshFilterUi();
   }
 
   function renderCategoryOrderList() {
@@ -1601,7 +1511,7 @@
     function persistSourceOrder() {
       settings.sourceOrder = [...container.querySelectorAll('.order-row')].map(r => r.dataset.id);
       saveSettings(settings);
-      renderSourceChips();
+      refreshFilterUi();
     }
 
     settingsSourceGroups().forEach(({ cat, sources }) => {
@@ -1706,7 +1616,16 @@
   const OFFLINE_DB_NAME = 'stiriNestireOffline';
   const OFFLINE_STORE = 'articles';
 
+  // O singura conexiune, deschisa la prima nevoie si refolosita (inainte: cate una noua
+  // la fiecare citire/scriere, niciodata inchisa).
+  let offlineDbPromise = null;
   function openOfflineDB() {
+    if (!offlineDbPromise) {
+      offlineDbPromise = openOfflineDBOnce().catch(e => { offlineDbPromise = null; throw e; });
+    }
+    return offlineDbPromise;
+  }
+  function openOfflineDBOnce() {
     return new Promise((resolve, reject) => {
       if (!window.indexedDB) { reject(new Error('IndexedDB indisponibil')); return; }
       const req = indexedDB.open(OFFLINE_DB_NAME, 1);
@@ -1715,7 +1634,12 @@
           req.result.createObjectStore(OFFLINE_STORE, { keyPath: 'link' });
         }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => { db.close(); offlineDbPromise = null; };
+        db.onclose = () => { offlineDbPromise = null; };
+        resolve(db);
+      };
       req.onerror = () => reject(req.error);
     });
   }
@@ -1798,6 +1722,7 @@
   let offlineDownloadRunning = false;
   let offlineDownloadLabel = '';
   async function downloadOfflineArticles() {
+    if (offlineDownloadRunning) return; // a doua atingere rapida nu mai porneste inca o descarcare
     const statusEl = document.getElementById('offlineStatus');
     // Mesajul apare si pe butonul din panou (panoul se poate redesena intre timp)
     const setStatus = text => {
@@ -1811,8 +1736,10 @@
       }
     };
 
+    offlineDownloadRunning = true;
     const pool = poolItems();
     if (pool.length === 0) {
+      offlineDownloadRunning = false;
       setStatus('Nimic de descărcat momentan.');
       setTimeout(() => setStatus(''), 2500);
       return;
@@ -1820,15 +1747,16 @@
     const cachedKeys = new Set(await offlineGetAllKeys());
     const toDownload = pool.filter(i => !cachedKeys.has(i.link)).slice(0, 40);
     if (toDownload.length === 0) {
+      offlineDownloadRunning = false;
       setStatus('Ai deja tot descărcat pentru offline.');
       setTimeout(() => setStatus(''), 2500);
       return;
     }
 
-    offlineDownloadRunning = true;
     setStatus(`Se pregătesc ${toDownload.length} articole pentru offline…`);
 
     let done = 0;
+    let saved = 0;
     let idx = 0;
     async function worker() {
       while (idx < toDownload.length) {
@@ -1836,7 +1764,12 @@
         try {
           const res = await fetch(`${WORKER_URL}?article=${encodeURIComponent(item.link)}`);
           const data = await res.json();
-          await offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text || '', cachedAt: Date.now() });
+          // Articolele fara text (blocate de site, doar pentru abonati) nu se salveaza:
+          // altfel ar parea "descarcate" si n-ar mai fi reincercate.
+          if (res.ok && data && data.text) {
+            await offlineSet({ link: item.link, title: item.title, source: item.source, date: item.date, text: data.text, cachedAt: Date.now() });
+            saved++;
+          }
         } catch {}
         done++;
         setStatus(`Se pregătesc articole pentru offline… (${done}/${toDownload.length})`);
@@ -1844,7 +1777,9 @@
     }
     await Promise.all([worker(), worker(), worker()]); // 3 cereri simultane
     offlineDownloadRunning = false;
-    setStatus(`Gata — ${toDownload.length} articole salvate pentru offline.`);
+    const missed = toDownload.length - saved;
+    setStatus(`Gata — ${saved} ${saved === 1 ? 'articol salvat' : 'articole salvate'} pentru offline.`
+      + (missed ? ` ${missed} fără text disponibil (site blocat sau doar pentru abonați).` : ''));
     setTimeout(() => setStatus(''), 3000);
   }
 
@@ -1889,8 +1824,13 @@
     'zapada', 'inghet', 'prognoz', 'furtun', 'vijelie'
   ]);
   // Cuvintele foarte scurte (ex. "anm") se cauta doar ca vorba intreaga.
+  const shortKeywordRe = new Map();
   function containsKeyword(text, keyword) {
-    if (keyword.length <= 3) return new RegExp(`\\b${keyword}\\b`).test(text);
+    if (keyword.length <= 3) {
+      let re = shortKeywordRe.get(keyword);
+      if (!re) { re = new RegExp(`\\b${keyword}\\b`); shortKeywordRe.set(keyword, re); }
+      return re.test(text);
+    }
     return text.includes(keyword);
   }
   // Doar sursele romanesti de actualitate: vremea n-are ce cauta la Sport sau IT,
@@ -1899,39 +1839,35 @@
     const meta = sourceMeta.find(s => s.name === sourceName);
     return Boolean(meta && meta.category === 'Actualitati' && meta.country === 'RO');
   }
+  // Rezultatul se tine minte per articol (la fiecare reincarcare a feed-ului articolele sunt
+  // obiecte noi, deci WeakMap-ul se goleste singur).
+  const weatherCache = new WeakMap();
   function isWeatherItem(item) {
-    if (!isGeneralNewsSource(item.source)) return false;
-    const t = normalizeForMatch(item.title);
-    if (WEATHER_STRONG.some(k => containsKeyword(t, k))) return true;
-    return WEATHER_WEAK.filter(k => containsKeyword(t, k)).length >= 2;
+    const known = weatherCache.get(item);
+    if (known !== undefined) return known;
+    let result = false;
+    if (isGeneralNewsSource(item.source)) {
+      const t = normalizeForMatch(item.title);
+      result = WEATHER_STRONG.some(k => containsKeyword(t, k))
+        || WEATHER_WEAK.filter(k => containsKeyword(t, k)).length >= 2;
+    }
+    weatherCache.set(item, result);
+    return result;
   }
-  function hasWeatherItems() {
-    const names = new Set(effectiveSources());
-    return allItems.some(i => names.has(i.source) && isWeatherItem(i));
-  }
-
-  const tabsEl = document.getElementById('tabs');
-  const subTabsEl = document.getElementById('subTabs');
   const mainEl = document.getElementById('main');
 
-  // Masoara inaltimile reale ale barei fixe de sus si ale randului de taburi de
-  // categorii, si le pune in variabile CSS - astfel randul de taburi si cel de
-  // surse (position: sticky) se lipesc exact sub bara fixa, indiferent de
-  // safe-area (notch) sau de cat de mare e fontul ales de utilizator.
+  // Masoara inaltimile reale ale barelor fixe de sus si de jos si le pune in variabile
+  // CSS (continutul paginii se aseaza intre ele), indiferent de safe-area (notch) sau de
+  // cat de mare e fontul ales de utilizator.
   function updateStickyOffsets() {
     const navBarTop = document.getElementById('navBarTop');
     if (navBarTop) {
       document.documentElement.style.setProperty('--navbar-top-h', `${navBarTop.getBoundingClientRect().height}px`);
     }
-    if (tabsEl && tabsEl.getBoundingClientRect().height > 0) {
-      document.documentElement.style.setProperty('--tabs-h', `${tabsEl.getBoundingClientRect().height}px`);
-    }
     const navBarBottom = document.getElementById('navBarBottom');
     if (navBarBottom) {
       document.documentElement.style.setProperty('--navbar-bottom-h', `${navBarBottom.getBoundingClientRect().height}px`);
     }
-    const subH = subTabsEl && subTabsEl.classList.contains('visible') ? subTabsEl.getBoundingClientRect().height : 0;
-    document.documentElement.style.setProperty('--filters-h', `${(tabsEl ? tabsEl.getBoundingClientRect().height : 0) + subH + 6}px`);
   }
   window.addEventListener('resize', updateStickyOffsets);
   window.addEventListener('orientationchange', updateStickyOffsets);
@@ -2029,15 +1965,17 @@
     });
     return Array.from(seen.values());
   }
-  function poolItems() {
-    return settings.dedupe ? dedupedPool() : basePool();
+  // keepLink: un articol care ramane in lista chiar daca e citit (cel deschis acum), ca
+  // "Articolul urmator" sa-si gaseasca pozitia si cu "ascunde citite" pornit.
+  function poolItems({ keepLink = null } = {}) {
+    return settings.dedupe ? dedupedPool({ keepLink }) : basePool({ keepLink });
   }
   // allSources = true: toate sursele categoriilor active (si cele debifate in Setari sau
   // neselectate in panou) - folosit doar de modul "Fara dubluri".
   // skipRead = true: nu ascunde articolele citite (modul "Fara dubluri" o face pe grup).
-  function basePool({ allSources = false, skipRead = false } = {}) {
-    const names = allSources ? discoveredSourceNames() : effectiveSources();
-    let items = allItems.filter(i => names.includes(i.source));
+  function basePool({ allSources = false, skipRead = false, keepLink = null, skipSearch = false } = {}) {
+    const names = new Set(allSources ? discoveredSourceNames() : effectiveSources());
+    let items = allItems.filter(i => names.has(i.source));
 
     if (activeCategories.size > 0) {
       const structuralCats = Array.from(activeCategories).filter(c => c !== 'Vremea');
@@ -2067,17 +2005,17 @@
       // redevina relevante daca utilizatorul reselecteaza categoria potrivita.
       const validScope = activeCategories.size > 0
         ? new Set(sourcesInActiveCategories().map(s => s.name))
-        : new Set(names);
+        : names;
       const effectiveNarrow = new Set(Array.from(activeSources).filter(n => validScope.has(n)));
       if (effectiveNarrow.size > 0) {
         items = items.filter(i => effectiveNarrow.has(i.source));
       }
     }
-    if (searchQuery) {
+    if (searchQuery && !skipSearch) {
       items = items.filter(i => i.title.toLowerCase().includes(searchQuery));
     }
     if (settings.hideRead && !skipRead) {
-      items = items.filter(i => !readLinks.has(i.link));
+      items = items.filter(i => !readLinks.has(i.link) || i.link === keepLink);
     }
     return items;
   }
@@ -2129,9 +2067,13 @@
     };
     const order = items.map((_, i) => i).sort((x, y) => time[y] - time[x]);
     const clusters = [];
+    const byToken = new Map(); // cuvant -> grupurile care il contin
     for (const i of order) {
       let best = null, bestScore = 0;
-      for (const c of clusters) {
+      const candidates = new Set();
+      toks[i].forEach(t => (byToken.get(t) || []).forEach(c => candidates.add(c)));
+      // in ordinea crearii grupurilor, ca la egalitate de scor sa castige acelasi grup ca inainte
+      for (const c of [...candidates].sort((x, y) => x.idx - y.idx)) {
         if (c.lang !== lang[i]) continue;
         if (time[i] && c.newest && c.newest - time[i] > DEDUPE_WINDOW_MS) continue;
         for (const m of c.members) {
@@ -2139,8 +2081,14 @@
           if (sc > bestScore) { bestScore = sc; best = c; }
         }
       }
+      let target = best;
       if (best && bestScore >= DEDUPE_MIN_SCORE) best.members.push(i);
-      else clusters.push({ members: [i], lang: lang[i], newest: time[i] });
+      else { target = { members: [i], lang: lang[i], newest: time[i], idx: clusters.length }; clusters.push(target); }
+      toks[i].forEach(t => {
+        const list = byToken.get(t);
+        if (!list) byToken.set(t, [target]);
+        else if (list[list.length - 1] !== target && !list.includes(target)) list.push(target);
+      });
     }
     return clusters.map(c => c.members);
   }
@@ -2149,10 +2097,12 @@
   let dupesByLink = new Map();
   let dedupeCache = { key: null, groups: null };
 
-  function dedupedPool() {
-    const preferred = basePool({ skipRead: true });          // ce vezi in mod normal (sursele bifate)
+  function dedupedPool({ keepLink = null } = {}) {
+    // Gruparea se face pe lista FARA cautare: ramane aceeasi cat timp tastezi (si nu
+    // se schimba de la o litera la alta); cautarea filtreaza apoi grupurile.
+    const preferred = basePool({ skipRead: true, skipSearch: true });          // sursele bifate
     const preferredLinks = new Set(preferred.map(i => i.link));
-    const wide = basePool({ allSources: true, skipRead: true }); // toate sursele categoriilor alese
+    const wide = basePool({ allSources: true, skipRead: true, skipSearch: true }); // toate sursele categoriilor
     const key = wide.length + '|' + wide.map(i => i.link).join('\n');
     if (dedupeCache.key !== key) dedupeCache = { key, groups: clusterStories(wide) };
 
@@ -2160,14 +2110,21 @@
     const rank = name => { const r = orderedNames.indexOf(name); return r === -1 ? Infinity : r; };
     dupesByLink = new Map();
     const reps = [];
+    const matches = i => !searchQuery || i.title.toLowerCase().includes(searchQuery);
     dedupeCache.groups.forEach(idxs => {
+      const all = idxs.map(i => wide[i]);
+      // Cu o cautare activa: grupul apare daca macar un titlu se potriveste, iar
+      // reprezentantul se alege dintre titlurile care se potrivesc.
+      if (searchQuery && !all.some(matches)) return;
       // Reprezentantul: intai sursele bifate, in ordinea ta din Setari; apoi celelalte.
-      const members = idxs.map(i => wide[i]).sort((a, b) =>
+      const members = all.sort((a, b) =>
+        (matches(a) ? 0 : 1) - (matches(b) ? 0 : 1) ||
         (preferredLinks.has(a.link) ? 0 : 1) - (preferredLinks.has(b.link) ? 0 : 1)
         || rank(a.source) - rank(b.source)
         || effectiveTimestamp(b.date) - effectiveTimestamp(a.date));
       // O stire deja citita (din oricare sursa) se ascunde in intregime, daca ai ales asta.
-      if (settings.hideRead && members.some(m => readLinks.has(m.link))) return;
+      if (settings.hideRead && members.some(m => readLinks.has(m.link))
+        && !members.some(m => m.link === keepLink)) return;
       const [rep, ...others] = members;
       if (others.length) dupesByLink.set(rep.link, others);
       reps.push(rep);
@@ -2198,35 +2155,8 @@
     );
   }
 
-  function renderTabs() {
-    const categories = visibleCategories();
-    tabsEl.innerHTML = '';
-    categories.forEach(cat => {
-      const btn = document.createElement('button');
-      btn.className = 'tab';
-      btn.dataset.cat = cat;
-      btn.textContent = CATEGORY_LABELS[cat] || cat;
-      btn.setAttribute('aria-pressed', String(activeCategories.has(cat)));
-      btn.addEventListener('click', () => {
-        if (activeCategories.has(cat)) activeCategories.delete(cat); else activeCategories.add(cat);
-        // NU stergem activeSources aici - o ingustare facuta intr-o categorie ramane
-        // memorata chiar daca deselectezi si reselectezi categoria mai tarziu.
-        // poolItems() ignora, fara sa distruga, sursele care nu mai apartin
-        // categoriilor curent active.
-        saveActiveFilters();
-        renderTabs();
-        renderSourceChips();
-        renderList();
-      });
-      tabsEl.appendChild(btn);
-    });
-    // Pe doua randuri inaltimea barei se poate schimba: recalculam pozitia barei de surse.
-    updateStickyOffsets();
-  }
 
-  // ---- Selectorul de surse: un rand-rezumat care se deschide intr-un panou ----
-  // Inlocuieste randul de butoane derulat lateral. Inchis ocupa un singur rand subtire;
-  // deschis arata toate sursele pe mai multe randuri, grupate (la Internațional, pe limbi).
+  // ---- Gruparea surselor in panoul de filtre (la Internațional, pe limbi) ----
   // Grupurile de limba sunt denumite in limba respectiva (cine citeste in franceza
   // recunoaste imediat "Français").
   const LANG_LABELS = { fr: 'Français', en: 'English', de: 'Deutsch', ro: 'Română' };
@@ -2273,33 +2203,13 @@
     // grupul selectat integral si exclusiv (ex. doar sursele in franceza)
     const exactGroup = selected.length > 1 && groups.find(g =>
       g.sources.length === selected.length && g.sources.every(s => activeSources.has(s.name)));
-    const value = selected.length === 0
-      ? `Toate (${sources.length})`
-      : exactGroup ? `${exactGroup.label} (${selected.length})`
-      : selected.length <= 2 ? selected.join(', ') : `${selected.slice(0, 2).join(', ')} +${selected.length - 2}`;
-    return { selected, groups, exactGroup, value };
+    return { selected, groups, exactGroup };
   }
 
-  // Randul "Surse" de la inceputul listei (nu mai sta lipit sus): deschide acelasi panou.
-  function renderSourceChips() {
-    subTabsEl.innerHTML = '';
-    const sources = scopeSources();
-    if (sources.length <= 1) {
-      subTabsEl.classList.remove('visible');
-    } else {
-      subTabsEl.classList.add('visible');
-      const { value } = sourceSelectionInfo(sources);
-      const summary = document.createElement('button');
-      summary.className = 'source-summary';
-      summary.type = 'button';
-      summary.setAttribute('aria-controls', 'filterSheet');
-      summary.innerHTML = `<span class="ss-label">Surse:</span><span class="ss-value">${escapeHtml(value)}</span><span class="ss-chevron" aria-hidden="true">▾</span>`;
-      summary.addEventListener('click', () => toggleFilterSheet('top'));
-      subTabsEl.appendChild(summary);
-    }
+  // Dupa orice schimbare de categorii/surse: eticheta butoanelor de filtre si panoul (daca e deschis).
+  function refreshFilterUi() {
     updateFilterButtons();
     if (filterSheetSide) renderFilterSheet();
-    updateStickyOffsets();
   }
 
   // Eticheta butoanelor din bare: categoria aleasa + eventual sursele restranse
@@ -2346,8 +2256,7 @@
     const applyCategories = (next, close) => {
       activeCategories = next;
       saveActiveFilters();
-      renderTabs();
-      renderSourceChips();
+      refreshFilterUi();
       renderList();
       if (close) closeFilterSheet();
     };
@@ -2416,7 +2325,7 @@
         allBtn.addEventListener('click', () => {
           sources.forEach(s => activeSources.delete(s.name));
           saveActiveFilters();
-          renderSourceChips();
+          refreshFilterUi();
           renderList();
         });
         srow.appendChild(allBtn);
@@ -2442,7 +2351,7 @@
             sources.forEach(s => activeSources.delete(s.name));
             if (!isOnlyThis) names.forEach(n => activeSources.add(n));
             saveActiveFilters();
-            renderSourceChips();
+            refreshFilterUi();
             renderList();
           });
           filterSheetEl.appendChild(lbl);
@@ -2458,7 +2367,7 @@
           chip.addEventListener('click', () => {
             if (activeSources.has(s.name)) activeSources.delete(s.name); else activeSources.add(s.name);
             saveActiveFilters();
-            renderSourceChips();   // panoul ramane deschis: poti alege mai multe surse la rand
+            refreshFilterUi();   // panoul ramane deschis: poti alege mai multe surse la rand
             renderList();
           });
           chips.appendChild(chip);
@@ -2481,18 +2390,25 @@
     filterSheetEl.scrollTop = keepScroll;
   }
 
+  let sheetOpener = null;
   function openFilterSheet(side) {
+    sheetOpener = document.activeElement;
     filterSheetSide = side;
     filterSheetEl.className = `filter-sheet ${side}`;
     filterSheetEl.hidden = false;
     renderFilterSheet();
     updateFilterButtons();
+    // Focusul intra in panou (util la tastatura si cititoare de ecran; pe telefon nu se vede nimic).
+    const first = filterSheetEl.querySelector('button[aria-pressed="true"]') || filterSheetEl.querySelector('button');
+    if (first) first.focus({ preventScroll: true });
   }
   function closeFilterSheet() {
     if (!filterSheetSide) return;
+    const focusWasInside = filterSheetEl.contains(document.activeElement) || document.activeElement === document.body;
     filterSheetSide = null;
     filterSheetEl.hidden = true;
     updateFilterButtons();
+    if (focusWasInside && sheetOpener && sheetOpener.isConnected && sheetOpener.focus) sheetOpener.focus({ preventScroll: true });
   }
   // Cu panoul deschis, oricare buton il inchide (nu il muta): nu pot exista doua deodata.
   function toggleFilterSheet(side) {
@@ -2550,7 +2466,7 @@
   document.addEventListener('click', e => {
     if (!filterSheetSide) return;
     const path = e.composedPath();
-    const inside = [filterSheetEl, document.getElementById('filterBtnTop'), document.getElementById('filterBtnBottom'), subTabsEl]
+    const inside = [filterSheetEl, document.getElementById('filterBtnTop'), document.getElementById('filterBtnBottom')]
       .some(el => path.includes(el));
     if (!inside) closeFilterSheet();
   });
@@ -2569,6 +2485,8 @@
   function buildListItem(item) {
     const li = document.createElement('li');
     li.className = 'item';
+    const itemLang = langOf(item);
+    if (itemLang !== 'ro') li.lang = itemLang;
 
     const btn = document.createElement('button');
     btn.className = 'item-btn';
@@ -2606,11 +2524,13 @@
     const star = document.createElement('button');
     star.className = 'fav-star' + (isFavorite(item.link) ? ' active' : '');
     star.setAttribute('aria-label', 'Favorit');
+    star.setAttribute('aria-pressed', String(isFavorite(item.link)));
     star.textContent = isFavorite(item.link) ? '★' : '☆';
     star.addEventListener('click', () => {
       toggleFavorite(item);
       star.classList.toggle('active');
       star.textContent = isFavorite(item.link) ? '★' : '☆';
+      star.setAttribute('aria-pressed', String(isFavorite(item.link)));
     });
 
     li.appendChild(btn);
@@ -2889,7 +2809,7 @@
         <button class="back-btn" id="backBtn">${escapeHtml(t.back)}</button>
         <div class="reading-actions">
           <button class="share-btn" id="shareBtn" aria-label="${escapeHtml(t.shareLabel)}">${escapeHtml(t.share)}</button>
-          <button class="fav-star-reading${isFavorite(item.link) ? ' active' : ''}" id="favStarReading" aria-label="${escapeHtml(t.fav)}">${isFavorite(item.link) ? '★' : '☆'}</button>
+          <button class="fav-star-reading${isFavorite(item.link) ? ' active' : ''}" id="favStarReading" aria-label="${escapeHtml(t.fav)}" aria-pressed="${isFavorite(item.link)}">${isFavorite(item.link) ? '★' : '☆'}</button>
         </div>
       </div>`;
   }
@@ -2930,10 +2850,15 @@
       toggleFavorite(item);
       star.classList.toggle('active');
       star.textContent = isFavorite(item.link) ? '★' : '☆';
+      star.setAttribute('aria-pressed', String(isFavorite(item.link)));
     });
   }
 
+  // Fiecare deschidere de articol primeste un numar; raspunsurile intarziate ale unui
+  // articol parasit intre timp (Inapoi, Articolul urmator) nu mai deseneaza nimic.
+  let articleRenderToken = 0;
   async function renderArticleView(item, from = 'list') {
+    const token = ++articleRenderToken;
     currentView = 'article';
     try { localStorage.setItem('stiriNestireEngaged', '1'); } catch {}
     updateNavButtons();
@@ -2949,7 +2874,7 @@
     const metaWithTime = text => `<p class="reading-meta">${metaBase} · ${Math.max(1, Math.round(text.split(/\s+/).length / 200))} ${escapeHtml(t.readTime)}</p>`;
 
     // Urmatorul articol din lista din care ai venit (lista filtrata curenta sau Favorite)
-    const sequence = from === 'favorites' ? favorites : poolItems();
+    const sequence = from === 'favorites' ? favorites : poolItems({ keepLink: item.link });
     const position = sequence.findIndex(i => i.link === item.link
       || (from !== 'favorites' && (dupesByLink.get(i.link) || []).some(d => d.link === item.link)));
     const nextItem = position >= 0 ? sequence[position + 1] : null;
@@ -2968,6 +2893,7 @@
     const originalLink = `<a class="reading-source-link" href="${safeHref(item.link)}" target="_blank" rel="noopener">${escapeHtml(t.original)}</a>`;
 
     function show(inner) {
+      if (token !== articleRenderToken || currentView !== 'article') return;
       mainEl.innerHTML = `<div class="reading" lang="${lang}">${readingHeaderHtml(item, t)}${inner}</div>`;
       wireReadingHeader(item, t);
     }
@@ -3055,6 +2981,7 @@
 
   // Apelat la fiecare schimbare de pagina (prin updateNavButtons)
   function onViewChanged() {
+    if (currentView !== 'list' && listObserver) { listObserver.disconnect(); listObserver = null; }
     document.documentElement.classList.toggle('view-article', currentView === 'article');
     updateReadingProgress();
     if (installLogicReady) {
@@ -3142,8 +3069,7 @@
 
       if (mode === 'initial') {
         history.replaceState({ view: 'list' }, '');
-        renderTabs();
-        renderSourceChips();
+        refreshFilterUi();
         renderList();
         updateStickyOffsets();
         setTimeout(showFilterHintOnce, 1200);
@@ -3152,8 +3078,7 @@
 
       const newCount = allItems.filter(i => !previousLinks.has(i.link)).length;
       const label = newCount > 0 ? `${newCount} ${newCount === 1 ? 'știre nouă' : 'știri noi'}` : 'Lista e la zi';
-      renderTabs();
-      renderSourceChips();
+      refreshFilterUi();
       if (currentView === 'list') {
         // Reimprospatarea automata nu te muta din locul in care citeai; cea manuala te duce sus.
         if (mode === 'manual' || window.scrollY < 200) {
@@ -3175,8 +3100,7 @@
         sourceMeta = snapshot.sources || [];
         allItems = snapshot.items.filter(i => i.title && isHttpLink(i.link));
         history.replaceState({ view: 'list' }, '');
-        renderTabs();
-        renderSourceChips();
+        refreshFilterUi();
         renderList();
         updateStickyOffsets();
         showStatus(`${describeLoadFailure()} — se arată ultima listă salvată.`);
@@ -3369,19 +3293,33 @@
       const banner = document.getElementById('updateBanner');
       banner.classList.add('visible');
       document.getElementById('updateReloadBtn').onclick = () => {
+        userRequestedUpdate = true;
         waitingWorker.postMessage({ type: 'SKIP_WAITING' });
       };
     }
 
     let refreshingPage = false;
+    // La prima vizita nu exista inca un service worker care controleaza pagina; cand cel
+    // nou preia controlul (clients.claim) nu e o actualizare, deci nu reincarcam pagina
+    // (altfel cine deschisese deja un articol era aruncat inapoi la lista).
+    const hadController = Boolean(navigator.serviceWorker.controller);
+    let userRequestedUpdate = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshingPage) return;
+      if (refreshingPage || !(hadController || userRequestedUpdate)) return;
       refreshingPage = true;
       window.location.reload();
     });
 
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then(registration => {
+        // La revenirea in aplicatie (cel mult o data pe ora) cerem si o verificare de versiune.
+        let lastUpdateCheck = Date.now();
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible' && Date.now() - lastUpdateCheck > 60 * 60 * 1000) {
+            lastUpdateCheck = Date.now();
+            registration.update().catch(() => {});
+          }
+        });
         // Caz 1: exista deja un worker nou, in asteptare, de la o vizita anterioara
         if (registration.waiting) {
           showUpdateBanner(registration.waiting);
