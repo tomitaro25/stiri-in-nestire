@@ -831,7 +831,7 @@
     text-justify: inter-word;
     -webkit-hyphens: auto;
     hyphens: auto;
-    hyphenate-limit-chars: 6 2 3; /* cuvinte de minimum 6 litere; minimum 2 litere pe rand, 3 pe randul nou */
+    hyphenate-limit-chars: 5 2 2; /* cuvinte de minimum 5 litere; minimum 2 litere pe rand si pe randul nou */
   }
   .reading-body p {
     font-family: var(--font-title);
@@ -3150,10 +3150,14 @@
   //  - patru sau mai multe consoane: dupa a doua (ins-truc-ție, opt-spre-ze-ce)
   //  - hiat: doar perechile care sunt INTOTDEAUNA hiat (po-e-zie, co-or-do-na); "ea", "ia", "io"...
   //    pot fi si diftong, deci nu le despartim niciodata
-  //  - la capat de rand: minimum 2 litere pe rand, minimum 3 pe randul nou (previne
-  //    despartiri gresite ca "culo-ri", unde "i" final nu e silaba); abrevierile (NATO) nu se despart
+  //  - la capat de rand: minimum 2 litere ramase pe rand si minimum 2 pe randul nou. O silaba
+  //    finala de 2 litere trece pe randul nou doar daca se termina in a, ă, â, e, o (mereu silaba:
+  //    ca-să, ma-re, cultu-ră); "i" si "u" finale pot fi nesilabice ("po-mi", "lu-ni", "cu-lori" ar fi
+  //    gresite), deci acolo cerem minimum 3 litere; abrevierile (NATO) nu se despart
+  //  - cuvintele se despart de la 5 litere in sus (mul-te, toa-te, du-pă)
   // (Franceza, engleza, germana: le desparte browserul, care are dictionare pentru ele.)
-  const RO_VOWELS = new Set('aăâeiîouAĂÂEIÎOU'.split(''));
+  const RO_VOWELS = new Set('aăâeiîouyAĂÂEIÎOUY'.split('')); // y: in nume straine (Hyun-dai)
+  const RO_SYLLABIC_FINAL = new Set('aăâeo'.split(''));
   const RO_OBSTRUENTS = new Set('bcdfghptv'.split(''));
   const RO_KEEP_TWO = ['lpt', 'mpt', 'mpț', 'mpţ', 'nct', 'ncț', 'ncţ', 'ncș', 'ncş', 'ndv', 'rct', 'rtf', 'stm'];
   const RO_ALWAYS_HIATUS = ['aa', 'ae', 'ao', 'ee', 'oe', 'oo', 'uu'];
@@ -3186,14 +3190,16 @@
       }
       if (at === null) continue;
       const pos = units[at].s;
-      if (pos < 2 || word.length - pos < 3) continue;
+      const rest = word.length - pos;
+      if (pos < 2 || rest < 2) continue;
+      if (rest === 2 && !RO_SYLLABIC_FINAL.has(low[low.length - 1])) continue;
       out += word.slice(last, pos) + '\u00AD';
       last = pos;
     }
     return out + word.slice(last);
   }
   function hyphenateRo(text) {
-    return text.replace(/[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]{6,}/g, hyphenateRoWord);
+    return text.replace(/[A-Za-zĂÂÎȘŞȚŢăâîșşțţ]{5,}/g, hyphenateRoWord);
   }
 
   function langOf(item) {
