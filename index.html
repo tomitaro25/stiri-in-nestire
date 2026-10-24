@@ -537,9 +537,11 @@
     transform: translateX(-50%);
     width: 100%;
     max-width: var(--max-width);
-    height: 3px;
+    height: 4px;
     z-index: 41;
     pointer-events: none;
+    /* "sina" se vede de la inceput, ca sa fie clar ca e o bara care se umple */
+    background: color-mix(in srgb, var(--rule) 75%, transparent);
   }
   html.view-article .read-progress { display: block; }
   .read-progress-fill {
@@ -943,6 +945,9 @@
       font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft);
       border-bottom: 1px solid var(--rule); border-right: 1px solid var(--rule); }
     .search-bar.visible + .list-heading { display: none; }
+    /* Progresul lecturii pe PC: sus, in coloana articolului (care se deruleaza separat) */
+    .pane-progress { position: sticky; top: 0; height: 4px; z-index: 2; background: color-mix(in srgb, var(--rule) 75%, var(--paper)); }
+    .pane-progress-fill { height: 100%; background: var(--teal); transform-origin: left center; transform: scaleX(0); }
     .reader-empty { padding: 4rem 2rem; color: var(--ink-soft); text-align: center; font-size: 0.95rem; line-height: 1.6; }
     .reader-empty .reader-empty-title { font-family: var(--font-title); font-size: 1.3rem; color: var(--ink); margin: 0 0 0.6rem; }
     /* bara de meniu sta sus, in coloana din stanga (fara fila Categorii: panoul e mereu deschis) */
@@ -1545,6 +1550,20 @@
     // Articol deschis pe ecran ingust, apoi fereastra marita: il mutam in panoul din dreapta
     if (isWide && wasArticle) { renderList(); openInReader(wasArticle, 'list'); }
   });
+  function updatePaneProgress() {
+    const pane = document.getElementById('readerPane');
+    const fill = pane.querySelector('.pane-progress-fill');
+    if (!fill) return;
+    const max = pane.scrollHeight - pane.clientHeight;
+    fill.style.transform = `scaleX(${max > 0 ? Math.min(1, Math.max(0, pane.scrollTop / max)) : 0})`;
+  }
+  let paneTicking = false;
+  document.getElementById('readerPane').addEventListener('scroll', () => {
+    if (paneTicking) return;
+    paneTicking = true;
+    requestAnimationFrame(() => { paneTicking = false; updatePaneProgress(); });
+  }, { passive: true });
+
   function renderReaderPlaceholder() {
     const pane = document.getElementById('readerPane');
     pane.innerHTML = `<div class="reader-empty"><p class="reader-empty-title">Alege un articol din listă</p>
@@ -3341,7 +3360,8 @@
     function show(inner) {
       if (token !== articleRenderToken) return;
       if (inPane ? readerItem !== item : currentView !== 'article') return;
-      container.innerHTML = `<div class="reading" lang="${lang}">${readingHeaderHtml(item, t, inPane)}${inner}</div>`;
+      container.innerHTML = `${inPane ? '<div class="pane-progress" aria-hidden="true"><div class="pane-progress-fill"></div></div>' : ''}<div class="reading" lang="${lang}">${readingHeaderHtml(item, t, inPane)}${inner}</div>`;
+      if (inPane) updatePaneProgress();
       wireReadingHeader(item, t, container, inPane);
     }
 
