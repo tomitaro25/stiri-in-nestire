@@ -3,14 +3,14 @@
 Agregator de știri românești și internaționale, ca aplicație web instalabilă (PWA): titlurile din 41 de publicații într-o singură listă cronologică, fără cont, fără reclame. Articolele se citesc direct în aplicație, cu textul extras din pagina originală.
 
 - **Aplicația:** https://tomitaro25.github.io/stiri-in-nestire/ (se instalează din browser; există și un APK pentru Android, împachetat ca TWA)
-- **Versiunea curentă a interfeței:** v62 (`CACHE_NAME` din `app/sw.js`)
+- **Versiunea curentă a interfeței:** v64 (`CACHE_NAME` din `app/sw.js`)
 
 ---
 
 ## Ce face
 
 - Adună știrile din 41 de surse (RSS/Atom/RDF și câteva pagini HTML) și le afișează cronologic, cu poze unde sursa le oferă.
-- **Citire în aplicație:** textul integral al articolului, justificat și despărțit corect în silabe pentru română; timp estimat de citire, „Articolul următor”, link spre original.
+- **Citire în aplicație:** textul integral al articolului, justificat și despărțit corect în silabe pentru română (reguli DOOM, implementate în aplicație, fiindcă telefoanele nu au dicționar de silabisire pentru română); când rândul e prea scurt (sub ~36 de caractere, la font foarte mare pe telefon), textul se aliniază automat la stânga, ca să nu apară spații mari. Timp estimat de citire, „Articolul următor”, link spre original.
 - **Categorii și surse:** Actualități, Vremea, Sport, Financiar, IT/Tech, Religie, Cultură, Internațional (grupat pe limbi). Se poate alege o categorie sau mai multe deodată și se poate restrânge la anumite surse.
 - **Vremea:** categorie automată — titlurile despre vreme, prognoze și avertizări, din sursele românești de actualitate.
 - **Ascunde știrile repetate:** aceeași știre publicată de mai multe surse apare o singură dată (din sursa preferată), cu celelalte variante sub titlu („Și la: …”). Gruparea compară cuvintele importante din titlu, doar în aceeași limbă, la cel mult 36 de ore distanță.

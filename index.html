@@ -833,6 +833,9 @@
     hyphens: auto;
     hyphenate-limit-chars: 5 2 2; /* cuvinte de minimum 5 litere; minimum 2 litere pe rand si pe randul nou */
   }
+  /* Rand prea scurt (font mare pe ecran ingust): intinderea intre margini ar lasa spatii mari
+     intre cuvinte, deci textul se aliniaza automat la stanga (despartirea in silabe ramane). */
+  html[data-text-align="justify"] .reading-body.narrow-measure p { text-align: left; }
   .reading-body p {
     font-family: var(--font-title);
     font-size: calc(1.125rem * var(--content-scale));
@@ -1131,6 +1134,7 @@
     document.querySelectorAll('.font-size-slider').forEach(sl => { sl.value = settings.fontSize; });
 
     if (typeof updateStickyOffsets === 'function') updateStickyOffsets(); // fontul poate schimba usor inaltimea barelor
+    if (typeof updateNarrowMeasure === 'function') updateNarrowMeasure(); // marimea fontului schimba lungimea randului
   }
 
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -1204,6 +1208,7 @@
               <button data-value="justify">La ambele margini</button>
               <button data-value="left">Aliniat la stânga</button>
             </div>
+            <p class="settings-hint" style="margin-top:0.4rem;">La text foarte mare pe ecran îngust, rândurile se aliniază automat la stânga, ca să nu apară spații mari între cuvinte.</p>
           </div>
         </section>
 
@@ -1360,6 +1365,7 @@
           </div></details>
           <details class="faq"><summary>Cum măresc textul sau schimb aspectul?</summary><div class="help-text">
             <p>În articol, butonul „Aa” din bara de jos. Din <strong>Setări → Aspect</strong> alegi și tema (deschis, întunecat, sepia sau automat), fontul, culoarea textului și alinierea.</p>
+            <p>Textul aliniat la ambele margini e despărțit în silabe, după regulile DOOM. Când textul e foarte mare și pe rând încap prea puține cuvinte, rândurile se aliniază automat la stânga, ca să nu apară spații mari.</p>
           </div></details>
           <details class="faq"><summary>Cum scap de articolele deja citite?</summary><div class="help-text">
             <p>Titlurile deschise apar estompate. Dacă preferi să dispară din listă, alege asta în <strong>Setări → Citire</strong>.</p>
@@ -1489,6 +1495,28 @@
     settings.fontSize = e.target.value;
     saveSettings(settings);
     applyVisualSettings(); // actualizeaza si celelalte slidere
+  }
+
+  // ---- Aliniere automata la stanga cand randul e prea scurt ----
+  // Textul intins intre margini arata bine de la ~36 de caractere pe rand. Sub atat (font mare
+  // pe telefon), chiar si cu despartire in silabe raman spatii mari: browserul nu foloseste
+  // intotdeauna despartirile posibile. Masuram cate caractere incap efectiv pe rand.
+  const NARROW_MEASURE_CHARS = 36;
+  function updateNarrowMeasure(scope) {
+    const roots = scope ? [scope] : [mainEl, document.getElementById('readerPane')];
+    roots.forEach(root => {
+      const body = root && root.querySelector('.reading-body');
+      const p = body && body.querySelector('p');
+      if (!p) return;
+      const probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre';
+      probe.textContent = 'Guvernul a aprobat proiectul de rectificare bugetară pentru pensionari';
+      p.appendChild(probe);
+      const perChar = probe.getBoundingClientRect().width / probe.textContent.length;
+      probe.remove();
+      if (!perChar) return;
+      body.classList.toggle('narrow-measure', p.clientWidth / perChar < NARROW_MEASURE_CHARS);
+    });
   }
 
   // ---- Ecran lat (PC): trei coloane ----
@@ -2218,6 +2246,7 @@
     }
   }
   window.addEventListener('resize', updateStickyOffsets);
+  window.addEventListener('resize', () => updateNarrowMeasure());
   window.addEventListener('orientationchange', updateStickyOffsets);
   window.addEventListener('load', updateStickyOffsets); // fonturile Google incarcate cu putin timp in urma pot schimba usor inaltimile
 
@@ -3330,6 +3359,7 @@
         ${originalLink}
         ${nextHtml}`);
       wireNext();
+      updateNarrowMeasure(container);
     }
 
     function renderFailure(reason) {
