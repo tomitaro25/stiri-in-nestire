@@ -550,6 +550,25 @@
     border: 1px solid var(--rule); border-radius: 999px; padding: 0.2rem 0.65rem;
   }
   .combine-toggle[aria-pressed="true"] { border-color: var(--teal); background: color-mix(in srgb, var(--teal) 16%, transparent); font-weight: 600; }
+  .panel-hint.dedupe-hint { margin: -0.15rem 0 0.4rem; }
+  .dupe-toggle {
+    all: unset; box-sizing: border-box; cursor: pointer; display: block;
+    margin: -0.55rem 0 0; padding: 0.15rem 2.6rem 0.75rem 1.25rem; width: 100%;
+    font-size: 0.78rem; color: var(--teal); overflow-wrap: anywhere;
+  }
+  .dupe-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+  .dupe-toggle .dupe-arrow { display: inline-block; transition: transform 0.15s ease; }
+  .dupe-toggle[aria-expanded="true"] .dupe-arrow { transform: rotate(90deg); }
+  .dupe-list { list-style: none; margin: 0; padding: 0 1.25rem 0.75rem 1.25rem; }
+  .dupe-list li { border-left: 2px solid var(--rule); margin: 0 0 0.35rem 0.2rem; }
+  .dupe-list button {
+    all: unset; box-sizing: border-box; cursor: pointer; display: block; width: 100%;
+    padding: 0.3rem 0.6rem; font-size: calc(0.88rem * var(--content-scale)); line-height: 1.3; color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  .dupe-list button:hover, .dupe-list button:focus-visible { background: var(--paper-raised); }
+  .dupe-list .dupe-meta { display: block; font-size: 0.74rem; color: var(--ink-soft); margin-top: 0.15rem; }
+  .dupe-list .is-read { color: var(--ink-soft); }
   .sheet-offline-btn {
     all: unset; box-sizing: border-box; display: block; width: 100%; text-align: center; cursor: pointer;
     margin-top: 0.9rem; padding: 0.6rem; border-radius: 10px; border: 1px dashed var(--teal);
@@ -1024,6 +1043,7 @@
     activeSources: null, // null = toate sursele din categoriile active; altfel, ultima ingustare facuta
     hideRead: false, // true = articolele deja deschise nu mai apar in lista
     combineCategories: false, // false = atingerea unei categorii o schimba; true = se combina cu celelalte
+    dedupe: false, // true = aceeasi stire din mai multe surse apare o singura data (din toate sursele categoriei)
     textAlign: 'justify' // 'justify' | 'left' - alinierea textului din articole
   };
 
@@ -1991,9 +2011,9 @@
   // incadrate la IT/Tech (acelea apar doar acolo, ca sa nu se duplice).
   // 'IT' e singura categorie care accepta si surse internationale (ex. XDA
   // Developers), pentru ca subiectul conteaza mai mult decat tara aici.
-  function sourcesInCategory(category) {
+  function sourcesInCategory(category, ignoreSelection = false) {
     if (category === 'Vremea') return []; // nu e legata de surse, e un filtru pe continut
-    const active = new Set(effectiveSources());
+    const active = new Set(ignoreSelection ? discoveredSourceNames() : effectiveSources());
     return sourceMeta.filter(s => {
       if (!active.has(s.name)) return false;
       if (category === 'International') return s.country !== 'RO' && s.category !== 'IT';
@@ -2010,7 +2030,13 @@
     return Array.from(seen.values());
   }
   function poolItems() {
-    const names = effectiveSources();
+    return settings.dedupe ? dedupedPool() : basePool();
+  }
+  // allSources = true: toate sursele categoriilor active (si cele debifate in Setari sau
+  // neselectate in panou) - folosit doar de modul "Fara dubluri".
+  // skipRead = true: nu ascunde articolele citite (modul "Fara dubluri" o face pe grup).
+  function basePool({ allSources = false, skipRead = false } = {}) {
+    const names = allSources ? discoveredSourceNames() : effectiveSources();
     let items = allItems.filter(i => names.includes(i.source));
 
     if (activeCategories.size > 0) {
@@ -2020,7 +2046,7 @@
       let combined = [];
       if (structuralCats.length > 0) {
         const namesInCats = new Set();
-        structuralCats.forEach(cat => sourcesInCategory(cat).forEach(s => namesInCats.add(s.name)));
+        structuralCats.forEach(cat => sourcesInCategory(cat, allSources).forEach(s => namesInCats.add(s.name)));
         combined = combined.concat(items.filter(i => namesInCats.has(i.source)));
       }
       if (wantsWeather) {
@@ -2034,7 +2060,7 @@
       });
     }
 
-    if (activeSources.size > 0) {
+    if (activeSources.size > 0 && !allSources) {
       // Aplicam doar sursele din activeSources care apartin categoriilor curent
       // active (sau, daca nu e nicio categorie activa, orice sursa efectiva).
       // Restul raman memorate in activeSources, fara efect acum, dar gata sa
@@ -2050,10 +2076,106 @@
     if (searchQuery) {
       items = items.filter(i => i.title.toLowerCase().includes(searchQuery));
     }
-    if (settings.hideRead) {
+    if (settings.hideRead && !skipRead) {
       items = items.filter(i => !readLinks.has(i.link));
     }
     return items;
+  }
+
+  // ---- "Fara dubluri": aceeasi stire din mai multe surse apare o singura data ----
+  // Doua titluri sunt considerate aceeasi stire daca, in aceeasi limba si in cel mult
+  // 36 de ore unul de altul, au in comun cel putin doua cuvinte importante, cu o pondere
+  // suficienta. Cuvintele foarte frecvente in lista (ex. "Bucuresti", "Guvernul") conteaza
+  // mai putin decat cele rare (ex. un nume propriu). Cuvintele de legatura se ignora, iar
+  // cuvintele lungi se compara dupa primele 5 litere (romanilor / Romania -> "roman").
+  // Cand ezita, algoritmul prefera sa lase articolele separate.
+  const DEDUPE_WINDOW_MS = 36 * 60 * 60 * 1000;
+  const DEDUPE_MIN_SCORE = 0.42;
+  const DEDUPE_STOPWORDS = new Set(`
+    a ai al ale alt alta altele am ar are as asa asta astazi au avea azi ca cand care cat ce cea cei cel cele celor cine cu cum da daca dar de deci decat despre din dintr dintre doar dupa e ea ei el ele era este eu fara fi fie fiind fost iar ii il in inca insa intr intre isi la le li lor lui mai mare mi mult multe ne nici noi nou noua nu o ori pe pentru prin sa sau se si sunt sus ta tot toti toate tu un una unei unor unui va vor zi zile ani an acum acesta aceasta acest aceste acestei acestui acestor iata vezi video foto live update breaking ultima ora oficial afla lucru
+    the of and for with from that this have has are was were will into after over about than what when who why how its his her their they them you your our not but new says said say amid more most also just been being onto upon off out up down very
+    le la les des un une du de et en au aux pour par sur dans avec sans sous est sont qui que quoi dont ou mais pas plus ce cette ces son sa ses leur leurs il elle ils elles nous vous apres avant selon entre contre comme tout tous toute toutes fait faire dit encore deja
+    der die das den dem des ein eine einer eines einem und oder aber mit von vom zu zum zur im in an am auf aus bei nach fur uber unter vor ist sind war wird werden hat haben nicht auch noch wie was wer sich als so nur schon jetzt neue neuer neues
+  `.trim().split(/\s+/));
+
+  function dedupeTokens(title) {
+    const norm = normalizeForMatch(title).replace(/[^a-z0-9]+/g, ' ');
+    const out = new Set();
+    for (const w of norm.split(' ')) {
+      if (!w) continue;
+      if (/^\d+$/.test(w)) { if (w.length >= 2) out.add(w); continue; } // ani, sume, scoruri
+      if (w.length < 3 || DEDUPE_STOPWORDS.has(w)) continue;
+      out.add(w.length > 5 ? w.slice(0, 5) : w);
+    }
+    return out;
+  }
+
+  // items: articole; returneaza grupuri de indici (fiecare grup = o stire)
+  function clusterStories(items) {
+    const langBySource = new Map(sourceMeta.map(s => [s.name, s.lang || 'ro']));
+    const lang = items.map(i => langBySource.get(i.source) || 'ro');
+    const time = items.map(i => effectiveTimestamp(i.date));
+    const toks = items.map(i => dedupeTokens(i.title));
+    const df = new Map();
+    toks.forEach(set => set.forEach(t => df.set(t, (df.get(t) || 0) + 1)));
+    const N = Math.max(items.length, 1);
+    const idf = t => Math.log(1 + N / (df.get(t) || 1));
+    const weight = toks.map(set => { let w = 0; set.forEach(t => { w += idf(t); }); return w; });
+    const score = (a, b) => {
+      const [small, big] = toks[a].size <= toks[b].size ? [toks[a], toks[b]] : [toks[b], toks[a]];
+      let shared = 0, w = 0;
+      small.forEach(t => { if (big.has(t)) { shared++; w += idf(t); } });
+      return shared < 2 ? 0 : w / Math.min(weight[a], weight[b]);
+    };
+    const order = items.map((_, i) => i).sort((x, y) => time[y] - time[x]);
+    const clusters = [];
+    for (const i of order) {
+      let best = null, bestScore = 0;
+      for (const c of clusters) {
+        if (c.lang !== lang[i]) continue;
+        if (time[i] && c.newest && c.newest - time[i] > DEDUPE_WINDOW_MS) continue;
+        for (const m of c.members) {
+          const sc = score(i, m);
+          if (sc > bestScore) { bestScore = sc; best = c; }
+        }
+      }
+      if (best && bestScore >= DEDUPE_MIN_SCORE) best.members.push(i);
+      else clusters.push({ members: [i], lang: lang[i], newest: time[i] });
+    }
+    return clusters.map(c => c.members);
+  }
+
+  // Celelalte articole despre aceeasi stire, dupa linkul articolului afisat.
+  let dupesByLink = new Map();
+  let dedupeCache = { key: null, groups: null };
+
+  function dedupedPool() {
+    const preferred = basePool({ skipRead: true });          // ce vezi in mod normal (sursele bifate)
+    const preferredLinks = new Set(preferred.map(i => i.link));
+    const wide = basePool({ allSources: true, skipRead: true }); // toate sursele categoriilor alese
+    const key = wide.length + '|' + wide.map(i => i.link).join('\n');
+    if (dedupeCache.key !== key) dedupeCache = { key, groups: clusterStories(wide) };
+
+    const orderedNames = applyCustomOrder(sourceMeta, settings.sourceOrder, s => s.name).map(s => s.name);
+    const rank = name => { const r = orderedNames.indexOf(name); return r === -1 ? Infinity : r; };
+    dupesByLink = new Map();
+    const reps = [];
+    dedupeCache.groups.forEach(idxs => {
+      // Reprezentantul: intai sursele bifate, in ordinea ta din Setari; apoi celelalte.
+      const members = idxs.map(i => wide[i]).sort((a, b) =>
+        (preferredLinks.has(a.link) ? 0 : 1) - (preferredLinks.has(b.link) ? 0 : 1)
+        || rank(a.source) - rank(b.source)
+        || effectiveTimestamp(b.date) - effectiveTimestamp(a.date));
+      // O stire deja citita (din oricare sursa) se ascunde in intregime, daca ai ales asta.
+      if (settings.hideRead && members.some(m => readLinks.has(m.link))) return;
+      const [rep, ...others] = members;
+      if (others.length) dupesByLink.set(rep.link, others);
+      reps.push(rep);
+    });
+    return reps.sort((a, b) => effectiveTimestamp(b.date) - effectiveTimestamp(a.date));
+  }
+  function storyIsRead(item) {
+    return readLinks.has(item.link) || (dupesByLink.get(item.link) || []).some(d => readLinks.has(d.link));
   }
 
   // Aplica o ordine aleasa de utilizator (prin drag&drop) peste o lista de
@@ -2187,6 +2309,7 @@
     const selected = scopeSources().filter(s => activeSources.has(s.name));
     if (selected.length === 1) label += ` · ${selected[0].name}`;
     else if (selected.length > 1) label += ` · ${selected.length} surse`;
+    if (settings.dedupe) label += ' · fără dubluri';
     [['filterBtnTop', 'top'], ['filterBtnBottom', 'bottom']].forEach(([id, side]) => {
       const btn = document.getElementById(id);
       if (!btn) return;
@@ -2255,6 +2378,27 @@
       catChips.appendChild(chip);
     });
     filterSheetEl.appendChild(catChips);
+
+    // Fara dubluri: aceeasi stire din mai multe surse apare o singura data.
+    const drow = document.createElement('div');
+    drow.className = 'sheet-row';
+    drow.style.marginTop = '1rem';
+    drow.innerHTML = `<p class="sheet-section-label">Aceeași știre, mai multe surse</p>
+      <button type="button" class="combine-toggle dedupe-toggle" aria-pressed="${settings.dedupe ? 'true' : 'false'}">Fără dubluri</button>`;
+    drow.querySelector('.dedupe-toggle').addEventListener('click', () => {
+      settings.dedupe = !settings.dedupe;
+      saveSettings(settings);
+      renderFilterSheet();
+      updateFilterButtons();
+      renderList();
+    });
+    filterSheetEl.appendChild(drow);
+    if (settings.dedupe) {
+      const dh = document.createElement('p');
+      dh.className = 'panel-hint dedupe-hint';
+      dh.textContent = 'Fiecare știre apare o singură dată, din toate sursele categoriei. Se afișează din sursele bifate mai jos (în ordinea ta din Setări), iar celelalte variante le găsești sub titlu.';
+      filterSheetEl.appendChild(dh);
+    }
 
     // Surse (grupate; la Internațional pe limbi, cu atingere pe titlul de grup)
     const sources = scopeSources();
@@ -2444,7 +2588,7 @@
     textWrap.className = 'item-text';
 
     const title = document.createElement('p');
-    title.className = 'item-title' + (readLinks.has(item.link) ? ' is-read' : '');
+    title.className = 'item-title' + ((settings.dedupe ? storyIsRead(item) : readLinks.has(item.link)) ? ' is-read' : '');
     title.textContent = item.title;
 
     const meta = document.createElement('div');
@@ -2471,6 +2615,39 @@
 
     li.appendChild(btn);
     li.appendChild(star);
+
+    const dupes = settings.dedupe ? (dupesByLink.get(item.link) || []) : [];
+    if (dupes.length) {
+      const names = [...new Set(dupes.map(d => d.source).filter(n => n !== item.source))];
+      const shown = names.slice(0, 2).join(', ');
+      const more = names.length > 2 ? ` +${names.length - 2}` : '';
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'dupe-toggle';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.innerHTML = `<span class="dupe-arrow">›</span> ${names.length
+        ? `Și la: ${escapeHtml(shown)}${more}`
+        : `Încă ${dupes.length} ${dupes.length === 1 ? 'articol' : 'articole'} din aceeași sursă`}`;
+      let listEl = null;
+      toggle.addEventListener('click', () => {
+        if (listEl) { listEl.remove(); listEl = null; toggle.setAttribute('aria-expanded', 'false'); return; }
+        listEl = document.createElement('ul');
+        listEl.className = 'dupe-list';
+        dupes.forEach(d => {
+          const dli = document.createElement('li');
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.innerHTML = `<span class="${readLinks.has(d.link) ? 'is-read' : ''}">${escapeHtml(d.title)}</span>
+            <span class="dupe-meta"><span class="source-tag" style="color:${colorForSource(d.source)}">${escapeHtml(d.source)}</span>${isFutureDate(d.date) ? '' : ` · ${escapeHtml(relTimeText(d))}`}</span>`;
+          b.addEventListener('click', () => navigateToArticle(d));
+          dli.appendChild(b);
+          listEl.appendChild(dli);
+        });
+        li.appendChild(listEl);
+        toggle.setAttribute('aria-expanded', 'true');
+      });
+      li.appendChild(toggle);
+    }
     return li;
   }
 
@@ -2773,7 +2950,8 @@
 
     // Urmatorul articol din lista din care ai venit (lista filtrata curenta sau Favorite)
     const sequence = from === 'favorites' ? favorites : poolItems();
-    const position = sequence.findIndex(i => i.link === item.link);
+    const position = sequence.findIndex(i => i.link === item.link
+      || (from !== 'favorites' && (dupesByLink.get(i.link) || []).some(d => d.link === item.link)));
     const nextItem = position >= 0 ? sequence[position + 1] : null;
     const nextHtml = nextItem
       ? `<button class="next-article" id="nextArticleBtn"><span class="next-label">${escapeHtml(t.next)} →</span><span class="next-title">${escapeHtml(nextItem.title)}</span></button>`
@@ -3222,5 +3400,9 @@
     });
   }
 </script>
+<!-- Cloudflare Web Analytics: statistici anonime (fara cookie-uri, fara identificarea vizitatorilor).
+     Fara internet, scriptul pur si simplu nu se incarca; aplicatia nu depinde de el. -->
+<script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "7369e5f711044a6caa537d718d778312"}'></script>
+<!-- End Cloudflare Web Analytics -->
 </body>
 </html>
